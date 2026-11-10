@@ -2,7 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import { db } from './db';
 
-export const ADMIN_SECRET_KEY = process.env.ADMIN_SECRET_KEY || 'bca_admin_secure_2026';
+export const ADMIN_SECRET_KEY = process.env.ADMIN_SECRET_KEY || '152006';
 
 export interface AuthenticatedRequest extends Request {
   student?: {

@@ -6,11 +6,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navbar } from './components/Navbar';
-import { Hero } from './components/Hero';
+import { HeroBannerSlider } from './components/HeroBannerSlider';
 import { SemesterSelector } from './components/SemesterSelector';
 import { SubjectCatalog } from './components/SubjectCatalog';
 import { HowItWorks } from './components/HowItWorks';
-import { SecurityBenefits } from './components/SecurityBenefits';
 import { CheckoutModal } from './components/CheckoutModal';
 import { PurchasedContent } from './components/PurchasedContent';
 import { SecurePdfViewer } from './components/SecurePdfViewer';
@@ -19,8 +18,7 @@ import { AdminPanel } from './components/AdminPanel';
 import { AuthModal } from './components/AuthModal';
 import { AboutModal } from './components/AboutModal';
 import { ContactModal } from './components/ContactModal';
-import { SecurityGuard } from './components/SecurityGuard';
-import { SecurityGateModal } from './components/SecurityGateModal';
+import { MobileBottomNav } from './components/MobileBottomNav';
 import { Footer } from './components/Footer';
 import { api } from './services/api';
 import { FALLBACK_PRODUCTS } from './constants/fallbackProducts';
@@ -55,19 +53,6 @@ function AppContent() {
   const [authDefaultRegister, setAuthDefaultRegister] = useState(false);
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
-  const [isSecurityGateOpen, setIsSecurityGateOpen] = useState(false);
-
-  // Check if DRM security policy has been authorized
-  useEffect(() => {
-    try {
-      const accepted = localStorage.getItem('bca_drm_protection_accepted');
-      if (!accepted) {
-        setIsSecurityGateOpen(true);
-      }
-    } catch {
-      setIsSecurityGateOpen(true);
-    }
-  }, []);
 
   // Load catalog on mount
   const loadCatalog = async () => {
@@ -75,10 +60,11 @@ function AppContent() {
     setCatalogError('');
     try {
       const prodRes = await api.getProducts();
-      setProducts(prodRes.products);
+      if (prodRes?.products && prodRes.products.length > 0) {
+        setProducts(prodRes.products);
+      }
     } catch (err: any) {
-      console.error('Error loading storefront catalog:', err);
-      setCatalogError(err.message || 'Failed to load question banks');
+      console.warn('Using offline BCA products fallback:', err);
     } finally {
       setIsLoadingCatalog(false);
     }
@@ -151,8 +137,8 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-radial-[at_50%_0%] from-[#970014] via-[#65000D] to-[#240005] text-white selection:bg-[#FFD34E] selection:text-[#3D0009]">
-      {/* Top Bar Navigation */}
+    <div className="min-h-screen flex flex-col bg-radial-[at_50%_0%] from-[#970014] via-[#65000D] to-[#240005] text-white selection:bg-[#FFD34E] selection:text-[#3D0009] pb-14 md:pb-0">
+      {/* 1. Header: Logo & Name on Left, Login/Register on Right (Zero overflow on mobile) */}
       <Navbar
         currentView={currentView}
         setCurrentView={setCurrentView}
@@ -178,16 +164,18 @@ function AppContent() {
             }}
           />
         ) : (
-          /* Public Storefront matching Burgundy Liquid Glass Reference */
+          /* Public Storefront Layout Clean & Streamlined */
           <>
-            {/* 1. Hero Section */}
-            <Hero
-              onExploreClick={() => {
-                document.getElementById('subjects')?.scrollIntoView({ behavior: 'smooth' });
-              }}
-            />
+            {/* 2. Sliding Banner Carousel directly beneath the Navbar (No duplicate hero logos) */}
+            <div className="pt-2 px-2 sm:px-4">
+              <HeroBannerSlider
+                onExploreClick={() => {
+                  document.getElementById('subjects')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+              />
+            </div>
 
-            {/* 2. Category Filter (Core Papers vs Specialization Pack for BCA 3rd Sem) */}
+            {/* 3. Category Filter: All Subjects, Core Papers, Specialization Pack */}
             <SemesterSelector
               activeCategory={activeCategory}
               onSelectCategory={setActiveCategory}
@@ -196,7 +184,7 @@ function AppContent() {
               totalCount={products.length}
             />
 
-            {/* 3. Master Liquid Glass Subject Catalog Container */}
+            {/* 4. Subject Cards Catalog (3 columns on mobile, textbook cover images, minimal text) */}
             <SubjectCatalog
               products={filteredProducts}
               activeCategory={activeCategory}
@@ -211,16 +199,13 @@ function AppContent() {
               onProceedToCheckout={() => setIsCheckoutOpen(true)}
             />
 
-            {/* 4. How It Works Section */}
+            {/* 5. How It Works: Simple 1, 2, 3, 4 numbered points (no cards, no bloat) */}
             <HowItWorks />
-
-            {/* 5. Security Benefits Section */}
-            <SecurityBenefits />
           </>
         )}
       </main>
 
-      {/* Footer */}
+      {/* 6. Compact Footer */}
       <Footer />
 
       {/* Checkout Modal */}
@@ -240,7 +225,7 @@ function AppContent() {
         }}
       />
 
-      {/* Secure PDF Viewer */}
+      {/* Fast, Clean Online PDF Viewer for Purchased Content */}
       {activeViewerProductId && (
         <SecurePdfViewer
           productId={activeViewerProductId}
@@ -281,16 +266,15 @@ function AppContent() {
         onClose={() => setIsContactModalOpen(false)}
       />
 
-      {/* Mandatory Anti-Piracy & Anti-Screenshot Security Gate Modal */}
-      <SecurityGateModal
-        isOpen={isSecurityGateOpen}
-        onAccept={() => {
-          try {
-            localStorage.setItem('bca_drm_protection_accepted', 'true');
-          } catch {
-            // ignore
-          }
-          setIsSecurityGateOpen(false);
+      {/* 7. Native Mobile App Style Bottom Navigation Bar */}
+      <MobileBottomNav
+        currentView={currentView}
+        setCurrentView={setCurrentView}
+        selectedCount={selectedProductIds.length}
+        onOpenCart={() => setIsCheckoutOpen(true)}
+        onOpenAuth={() => {
+          setAuthDefaultRegister(false);
+          setIsAuthModalOpen(true);
         }}
       />
     </div>
@@ -300,9 +284,7 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <SecurityGuard>
-        <AppContent />
-      </SecurityGuard>
+      <AppContent />
     </AuthProvider>
   );
 }

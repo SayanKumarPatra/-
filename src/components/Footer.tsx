@@ -6,9 +6,9 @@ export const Footer: React.FC = () => {
   const [activeModal, setActiveModal] = useState<'privacy' | 'terms' | null>(null);
 
   return (
-    <footer className="mt-20 border-t border-[#FFE7A3]/20 bg-[#3D0009]/90 backdrop-blur-xl text-xs text-white/70">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8 pb-8 border-b border-white/10">
+    <footer className="mt-6 border-t border-[#FFE7A3]/20 bg-[#200004]/95 backdrop-blur-xl text-xs text-white/70">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 border-b border-white/10">
           {/* Brand with Official Logo */}
           <div className="space-y-2">
             <div className="flex items-center gap-3">

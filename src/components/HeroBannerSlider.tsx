@@ -1,77 +1,41 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Sparkles, BookOpen, ShieldCheck, Cpu, Database, Flame } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-interface BannerSlide {
+export interface BannerSlide {
   id: string;
-  tag: string;
-  tagColor: string;
   title: string;
-  highlight: string;
-  subtitle: string;
-  badge: string;
-  icon: React.ElementType;
-  bgGradient: string;
-  chips: string[];
+  imageUrl: string;
+  alt: string;
 }
 
 export const HeroBannerSlider: React.FC<{ onExploreClick: () => void }> = ({ onExploreClick }) => {
   const slides: BannerSlide[] = [
     {
-      id: 'slide-1',
-      tag: '🔥 NEW 2024–2025 EDITION',
-      tagColor: 'from-amber-400 to-yellow-500 text-amber-950',
-      title: 'BCA 3rd Semester',
-      highlight: 'Core Question Banks',
-      subtitle: 'Complete Solved Sets for Computer Architecture (MAJ-3), Advanced DB (SEC-3), Business Env, Ethics, Bengali & Sanskrit.',
-      badge: '6 Core Papers Available',
-      icon: BookOpen,
-      bgGradient: 'from-[#8a0014] via-[#52000a] to-[#240005]',
-      chips: ['MAJ-3', 'MIN-3', 'MDC-3', 'SEC-3', 'AEC-3 Bengali', 'AEC-3 Sanskrit'],
+      id: 'banner-welcome',
+      title: 'Welcome to BCA STUDY POINT - Complete Exam Question Bank',
+      imageUrl: '/assets/aistudio/BCA_Study_Point_Exam_Prep_Banner_703b034c.png',
+      alt: 'Welcome to BCA STUDY POINT - Complete BCA Question Bank with Previous Year, Important & Probable Questions',
     },
     {
-      id: 'slide-2',
-      tag: '⚡ SPECIALIZATION PACK',
-      tagColor: 'from-[#FFD34E] to-[#FF9900] text-[#3D0009]',
-      title: 'BCA 3rd Sem High-Yield',
-      highlight: 'AI, ML, DS & Cyber Security',
-      subtitle: 'Master probable questions, algorithms, and university laboratory solutions for Artificial Intelligence, Machine Learning, Data Science & IoT.',
-      badge: '5 High-Demand Tech Modules',
-      icon: Cpu,
-      bgGradient: 'from-[#65000D] via-[#48000b] to-[#1a0003]',
-      chips: ['AI (Artificial Intelligence)', 'ML (Machine Learning)', 'DS (Data Science)', 'CS (Cyber Security)', 'ITES & IoT'],
+      id: 'banner-subjects',
+      title: 'Explore Our BCA 3rd Sem Subjects',
+      imageUrl: '/assets/aistudio/BCA_Study_Point_Subjects_Banner_4b0de4c1.png',
+      alt: 'Explore Our BCA Subjects - Question Bank, Important Questions, PYQs',
     },
     {
-      id: 'slide-3',
-      tag: '🎯 9+ SGPA GUARANTEED STRATEGY',
-      tagColor: 'from-emerald-300 to-teal-400 text-teal-950',
-      title: 'Past 5 Years Solved Papers',
-      highlight: '& Verified Model Answers',
-      subtitle: 'Prepared and verified strictly according to latest university syllabus guidelines for fast revision before exams.',
-      badge: 'Verified Answers & Step-by-Step Code',
-      icon: Database,
-      bgGradient: 'from-[#730010] via-[#4f000c] to-[#1f0004]',
-      chips: ['100% Exam-Oriented', 'Step-by-Step Proofs', 'University Model Sets'],
-    },
-    {
-      id: 'slide-4',
-      tag: '🛡️ SECURE DRM PROTECTED',
-      tagColor: 'from-yellow-300 to-amber-400 text-amber-950',
-      title: 'Instant Online Reader',
-      highlight: 'UPI / Card Instant Unlock',
-      subtitle: 'Pay via UPI, GPay, PhonePe or Card to get instant access. Read safely on your mobile or PC with our protected continuous-scroll reader.',
-      badge: 'Zero Waiting Time · One-Device Lock',
-      icon: ShieldCheck,
-      bgGradient: 'from-[#5d000c] via-[#3a0008] to-[#140002]',
-      chips: ['Instant Access', 'Protected Reader', 'Mobile & Desktop Friendly'],
+      id: 'banner-special-offer',
+      title: 'Special Offer - Get Your Desired Question Bank at Special Price',
+      imageUrl: '/assets/aistudio/BCA_Study_Point_Special_Offer_3cca2cdd.png',
+      alt: 'Special Offer - Limited Time Offer - Score Higher',
     },
   ];
 
   const [currentIdx, setCurrentIdx] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const touchStartX = useRef<number | null>(null);
-  const touchEndX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
 
-  // Auto-play timer (every 4.5 seconds)
+  // Auto-slide every 4.5 seconds
   useEffect(() => {
     if (isPaused) return;
     const interval = setInterval(() => {
@@ -81,139 +45,105 @@ export const HeroBannerSlider: React.FC<{ onExploreClick: () => void }> = ({ onE
     return () => clearInterval(interval);
   }, [isPaused, slides.length]);
 
-  const handlePrev = () => {
+  const handlePrev = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setCurrentIdx((prev) => (prev - 1 + slides.length) % slides.length);
   };
 
-  const handleNext = () => {
+  const handleNext = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setCurrentIdx((prev) => (prev + 1) % slides.length);
   };
 
-  // Touch Swipe for Mobile
+  // Safe Touch Swipe (Never blocks vertical finger scrolling)
   const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.targetTouches[0].clientX;
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
   };
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    touchEndX.current = e.targetTouches[0].clientX;
-  };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
 
-  const handleTouchEnd = () => {
-    if (touchStartX.current !== null && touchEndX.current !== null) {
-      const deltaX = touchStartX.current - touchEndX.current;
-      if (deltaX > 45) {
-        // Swiped Left -> Next
+    const deltaX = touchStartX.current - touchEndX;
+    const deltaY = touchStartY.current - touchEndY;
+
+    // Only swipe if horizontal motion was dominant
+    if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+      if (deltaX > 0) {
         handleNext();
-      } else if (deltaX < -45) {
-        // Swiped Right -> Prev
+      } else {
         handlePrev();
       }
     }
     touchStartX.current = null;
-    touchEndX.current = null;
+    touchStartY.current = null;
   };
-
-  const currentSlide = slides[currentIdx];
-  const IconComponent = currentSlide.icon;
 
   return (
     <div
-      className="w-full max-w-4xl mx-auto my-3 relative select-none"
+      className="w-full max-w-5xl mx-auto my-1.5 sm:my-2.5 relative select-none"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Liquid Glass Banner Container */}
+      {/* 
+        Authoritative Fixed-Height Standardized Banner Frame:
+        - Mobile: Fixed 145px height (perfect proportion for mobile screens)
+        - Tablet: Fixed 185px height
+        - Desktop: Fixed 240px height
+        - Regardless of source image resolution, image fills cleanly via object-cover object-center
+      */}
       <div
-        className={`relative overflow-hidden rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-7 bg-gradient-to-br ${currentSlide.bgGradient} border border-[#FFE7A3]/30 shadow-[0_12px_40px_rgba(0,0,0,0.65)] transition-all duration-500`}
+        onClick={onExploreClick}
+        className="relative w-full h-[145px] sm:h-[185px] md:h-[225px] lg:h-[245px] rounded-2xl sm:rounded-3xl overflow-hidden border border-[#FFE7A3]/30 shadow-[0_10px_30px_rgba(0,0,0,0.65)] bg-black/70 cursor-pointer group"
       >
-        {/* Specular Light Reflection Beam */}
-        <div className="absolute inset-x-8 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#FFE7A3]/60 to-transparent pointer-events-none" />
+        {/* Specular Rim Light */}
+        <div className="absolute inset-x-6 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#FFE7A3]/60 to-transparent pointer-events-none z-10" />
 
-        {/* Ambient Radial Accent */}
-        <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-[#FFD34E]/15 blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-12 -left-12 w-48 h-48 rounded-full bg-[#970014]/40 blur-3xl pointer-events-none" />
+        {/* Ambient Subtle Vignette on Edges */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-black/15 pointer-events-none z-10" />
 
-        {/* Slide Inner Grid */}
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-4 text-left">
-          {/* Left Text Column */}
-          <div className="flex-1 space-y-2">
-            {/* Pill Tag */}
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/45 border border-[#FFE7A3]/30 backdrop-blur-md shadow-xs">
-              <span className={`text-[10px] sm:text-xs font-black tracking-wide uppercase px-2 py-0.5 rounded-full bg-gradient-to-r ${currentSlide.tagColor}`}>
-                {currentSlide.tag}
-              </span>
-              <span className="text-[10px] sm:text-xs text-[#FFE7A3] font-bold">
-                {currentSlide.badge}
-              </span>
-            </div>
-
-            {/* Title & Highlight */}
-            <h2 className="text-lg sm:text-2xl md:text-3xl font-black text-white tracking-tight leading-snug">
-              {currentSlide.title}{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FFE7A3] via-[#FFD34E] to-[#FFF1C2]">
-                {currentSlide.highlight}
-              </span>
-            </h2>
-
-            {/* Subtitle */}
-            <p className="text-xs sm:text-sm text-white/85 leading-relaxed font-normal max-w-xl">
-              {currentSlide.subtitle}
-            </p>
-
-            {/* Paper Chips */}
-            <div className="flex flex-wrap items-center gap-1.5 pt-1">
-              {currentSlide.chips.map((chip, i) => (
-                <span
-                  key={i}
-                  className="px-2 py-0.5 rounded-md text-[9px] sm:text-[10px] font-mono font-bold bg-white/10 text-[#FFE7A3] border border-white/15 backdrop-blur-xs"
-                >
-                  {chip}
-                </span>
-              ))}
-            </div>
+        {/* Slides Stack with Smooth Cross-Fade Transition */}
+        {slides.map((slide, idx) => (
+          <div
+            key={slide.id}
+            className={`absolute inset-0 w-full h-full transition-opacity duration-500 ease-in-out ${
+              idx === currentIdx ? 'opacity-100 z-0' : 'opacity-0 -z-10 pointer-events-none'
+            }`}
+          >
+            <img
+              src={slide.imageUrl}
+              alt={slide.alt}
+              className="w-full h-full object-cover object-center"
+              loading={idx === 0 ? 'eager' : 'lazy'}
+            />
           </div>
+        ))}
 
-          {/* Right Visual Emblem & Action CTA */}
-          <div className="shrink-0 flex md:flex-col items-center justify-between w-full md:w-auto gap-3 pt-2 md:pt-0 border-t md:border-t-0 border-white/10">
-            {/* Center Glowing Icon */}
-            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-b from-white/20 via-[#970014]/70 to-[#3D0009] border border-[#FFD34E]/40 flex items-center justify-center text-[#FFD34E] shadow-[0_0_25px_rgba(255,211,78,0.3)]">
-              <IconComponent className="w-6 h-6 sm:w-8 sm:h-8" />
-            </div>
-
-            {/* Quick Button */}
-            <button
-              onClick={onExploreClick}
-              className="btn-gold-primary px-4 sm:px-5 py-2 text-xs font-black rounded-full flex items-center gap-1.5 cursor-pointer shadow-md whitespace-nowrap"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>View Subjects</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Previous / Next Arrow Controls */}
+        {/* Previous Navigation Arrow Button */}
         <button
           onClick={handlePrev}
           aria-label="Previous Slide"
-          className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-black/45 hover:bg-black/70 border border-white/20 flex items-center justify-center text-white/80 hover:text-[#FFD34E] transition-all cursor-pointer z-20 backdrop-blur-xs"
+          className="absolute left-2 sm:left-3.5 top-1/2 -translate-y-1/2 w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-black/60 hover:bg-black/85 border border-white/25 flex items-center justify-center text-white/90 hover:text-[#FFD34E] transition-all cursor-pointer z-20 backdrop-blur-xs shadow-md"
         >
           <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
         </button>
 
+        {/* Next Navigation Arrow Button */}
         <button
           onClick={handleNext}
           aria-label="Next Slide"
-          className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-black/45 hover:bg-black/70 border border-white/20 flex items-center justify-center text-white/80 hover:text-[#FFD34E] transition-all cursor-pointer z-20 backdrop-blur-xs"
+          className="absolute right-2 sm:right-3.5 top-1/2 -translate-y-1/2 w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-black/60 hover:bg-black/85 border border-white/25 flex items-center justify-center text-white/90 hover:text-[#FFD34E] transition-all cursor-pointer z-20 backdrop-blur-xs shadow-md"
         >
           <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
         </button>
       </div>
 
-      {/* Dot Indicators */}
-      <div className="flex items-center justify-center gap-2 mt-2.5">
+      {/* Slim Dot Indicators */}
+      <div className="flex items-center justify-center gap-1.5 mt-2">
         {slides.map((s, idx) => (
           <button
             key={s.id}

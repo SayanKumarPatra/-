@@ -52,6 +52,7 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   const [prodPrice, setProdPrice] = useState(149);
   const [prodDesc, setProdDesc] = useState('');
   const [prodHighlights, setProdHighlights] = useState('');
+  const [prodCoverUrl, setProdCoverUrl] = useState('');
   const [prodFile, setProdFile] = useState<File | null>(null);
 
   // Device reset modal state
@@ -167,6 +168,7 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
     formData.append('subjectName', prodName);
     formData.append('price', String(prodPrice));
     formData.append('description', prodDesc);
+    formData.append('coverImageUrl', prodCoverUrl);
     formData.append('published', 'true');
     formData.append('syllabusHighlights', JSON.stringify(prodHighlights.split('\n').filter(Boolean)));
     if (prodFile) {
@@ -180,6 +182,7 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
       setProdName('');
       setProdDesc('');
       setProdHighlights('');
+      setProdCoverUrl('');
       setProdFile(null);
       showSuccessBanner('Subject and question bank created successfully!');
       loadAllAdminData();
@@ -259,9 +262,6 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
             >
               Authenticate Admin
             </button>
-            <p className="text-[11px] text-white/50">
-              Default system key: <code className="bg-black/40 px-1.5 py-0.5 rounded text-[#FFD34E] font-mono">bca_admin_secure_2026</code>
-            </p>
           </form>
 
           <button
@@ -646,6 +646,22 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
                   />
                 </div>
 
+                <div>
+                  <label className="block text-xs font-bold text-white mb-1">
+                    Book Cover Image URL (Optional)
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="https://example.com/cover-book.png or /assets/..."
+                    value={prodCoverUrl}
+                    onChange={(e) => setProdCoverUrl(e.target.value)}
+                    className="w-full px-3 py-2 text-xs bg-black/50 border border-white/20 rounded-xl text-white"
+                  />
+                  <p className="text-[10px] text-white/50 mt-0.5">
+                    Leave blank to use the high-contrast default textbook cover graphic.
+                  </p>
+                </div>
+
                 {/* PDF File Upload */}
                 <div>
                   <label className="block text-xs font-bold text-white mb-1">
@@ -1009,7 +1025,7 @@ RAZORPAY_KEY_SECRET="..."
 RAZORPAY_WEBHOOK_SECRET="..."
 
 # Admin Security
-ADMIN_SECRET_KEY="bca_admin_secure_2026"
+ADMIN_SECRET_KEY="152006"
 
 # App Port
 PORT=3000`}

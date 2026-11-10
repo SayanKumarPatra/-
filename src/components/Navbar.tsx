@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UserCheck, LogOut, ShieldCheck, Lock, User, UserPlus, Menu, X, ShoppingBag } from 'lucide-react';
+import { UserCheck, LogOut, Lock, UserPlus, Menu, X, ShoppingBag } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { BRAND } from '../constants/brand';
 
@@ -38,51 +38,41 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-[#3D0009]/80 backdrop-blur-xl border-b border-[#FFE7A3]/20 shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
-        {/* Zone 1: Official Brand Logo & Name */}
+    <header className="sticky top-0 z-40 bg-[#3D0009]/95 backdrop-blur-xl border-b border-[#FFE7A3]/25 shadow-md">
+      <div className="max-w-7xl mx-auto px-2.5 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2">
+        {/* Left: Official Brand Logo & Name (Compact, Never Overflow) */}
         <div
           onClick={() => {
             setCurrentView('catalog');
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
-          className="flex items-center gap-3 cursor-pointer shrink-0 select-none group"
+          className="flex items-center gap-2 cursor-pointer shrink-0 select-none"
         >
-          <div className="relative">
-            <img
-              src={BRAND.logoUrl}
-              alt="BCA STUDY POINT Logo"
-              className="w-12 h-12 rounded-full object-cover shadow-[0_0_15px_rgba(255,211,78,0.4)] ring-2 ring-[#FFD34E]/60 transition-transform duration-300 group-hover:scale-105"
-            />
-            <div className="absolute inset-0 rounded-full ring-1 ring-white/40 pointer-events-none" />
-          </div>
-
+          <img
+            src={BRAND.logoUrl}
+            alt="BCA STUDY POINT Logo"
+            className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover ring-1.5 ring-[#FFD34E]/70 shadow-sm"
+          />
           <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <span className="text-xl font-extrabold tracking-tight text-white leading-tight drop-shadow-sm font-sans">
-                BCA STUDY POINT
-              </span>
-              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.2 rounded-full bg-emerald-950/70 border border-emerald-400/40 text-[9px] font-bold text-emerald-300">
-                <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
-                <span>DRM Active</span>
-              </span>
-            </div>
-            <span className="text-[11px] font-semibold text-[#FFE7A3] tracking-wide mt-0.5">
+            <span className="text-xs sm:text-base font-black tracking-tight text-white leading-tight font-sans">
+              BCA STUDY POINT
+            </span>
+            <span className="hidden sm:inline text-[10px] font-semibold text-[#FFE7A3] tracking-wider">
               {BRAND.tagline}
             </span>
           </div>
         </div>
 
-        {/* Zone 2: Premium Translucent Glass Nav Links */}
-        <nav className="hidden lg:flex items-center gap-2 text-sm font-medium">
+        {/* Center: Desktop Nav Links */}
+        <nav className="hidden md:flex items-center gap-1 text-xs font-semibold">
           <button
             onClick={() => {
               setCurrentView('catalog');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+            className={`px-3 py-1.5 rounded-full transition-all cursor-pointer ${
               currentView === 'catalog'
-                ? 'bg-[#970014] text-[#FFE7A3] border border-[#FFD34E]/50 shadow-[0_0_12px_rgba(255,211,78,0.25)]'
+                ? 'bg-[#970014] text-[#FFE7A3] border border-[#FFD34E]/50'
                 : 'text-white/85 hover:text-white hover:bg-white/10'
             }`}
           >
@@ -91,28 +81,28 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           <button
             onClick={() => scrollToSection('subjects')}
-            className="px-4 py-1.5 rounded-full text-xs font-semibold text-white/85 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+            className="px-3 py-1.5 rounded-full text-white/85 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
           >
             Subjects
           </button>
 
           <button
             onClick={() => scrollToSection('how-it-works')}
-            className="px-4 py-1.5 rounded-full text-xs font-semibold text-white/85 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+            className="px-3 py-1.5 rounded-full text-white/85 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
           >
             How It Works
           </button>
 
           <button
             onClick={onOpenAbout}
-            className="px-4 py-1.5 rounded-full text-xs font-semibold text-white/85 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+            className="px-3 py-1.5 rounded-full text-white/85 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
           >
             About
           </button>
 
           <button
             onClick={onOpenContact}
-            className="px-4 py-1.5 rounded-full text-xs font-semibold text-white/85 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+            className="px-3 py-1.5 rounded-full text-white/85 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
           >
             Contact
           </button>
@@ -120,24 +110,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           {isLoggedIn && (
             <button
               onClick={() => setCurrentView('purchased')}
-              className={`px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-full flex items-center gap-1 transition-all cursor-pointer ${
                 currentView === 'purchased'
-                  ? 'bg-[#970014] text-[#FFE7A3] border border-[#FFD34E]/50 shadow-[0_0_12px_rgba(255,211,78,0.25)]'
+                  ? 'bg-[#970014] text-[#FFE7A3] border border-[#FFD34E]/50'
                   : 'text-[#FFE7A3] hover:text-white hover:bg-white/10'
               }`}
             >
-              <ShieldCheck className="w-3.5 h-3.5 text-[#FFD34E]" />
-              <span>Purchased Content</span>
+              Purchased Content
             </button>
           )}
 
           <button
             onClick={() => setCurrentView('admin')}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 transition-all cursor-pointer ${
-              currentView === 'admin'
-                ? 'bg-[#970014] text-[#FFE7A3] border border-[#FFD34E]/50'
-                : 'text-white/50 hover:text-white/80'
-            }`}
+            className="px-2.5 py-1.5 rounded-full text-white/50 hover:text-white/80 flex items-center gap-1 transition-all cursor-pointer"
             title="Administrator Portal"
           >
             <Lock className="w-3 h-3 text-[#FFD34E]/70" />
@@ -145,53 +130,54 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </nav>
 
-        {/* Zone 3: Actions (Cart, Login, Register) */}
-        <div className="flex items-center gap-2.5 shrink-0">
-          {/* Selected subjects cart pill */}
+        {/* Right: Actions (Cart, Login, Register - Ultra Compact for Mobile) */}
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          {/* Cart Pill */}
           {selectedCount > 0 && currentView === 'catalog' && (
             <button
               onClick={onOpenCart}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-[#3D0009] bg-[#FFD34E] rounded-full shadow-[0_0_15px_rgba(255,211,78,0.4)] hover:bg-[#FFE7A3] transition-all cursor-pointer animate-pulse"
+              className="flex items-center gap-1 px-2.5 py-1 text-[10px] sm:text-xs font-black text-[#3D0009] bg-[#FFD34E] rounded-full shadow-sm hover:bg-[#FFE7A3] transition-all cursor-pointer whitespace-nowrap"
             >
-              <ShoppingBag className="w-3.5 h-3.5" />
-              <span>{selectedCount} Selected</span>
+              <ShoppingBag className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              <span>{selectedCount}</span>
+              <span className="hidden xs:inline">Selected</span>
             </button>
           )}
 
           {isLoggedIn && student ? (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <button
                 onClick={() => setCurrentView('purchased')}
-                className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-white bg-white/10 hover:bg-white/20 border border-[#FFE7A3]/30 px-3 py-1.5 rounded-full transition-all cursor-pointer"
+                className="flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-white bg-white/10 hover:bg-white/20 border border-[#FFE7A3]/30 px-2 sm:px-3 py-1 rounded-full transition-all cursor-pointer"
                 title={student.email}
               >
-                <UserCheck className="w-3.5 h-3.5 text-[#FFD34E]" />
-                <span className="truncate max-w-[110px]">{student.fullName}</span>
+                <UserCheck className="w-3 h-3 text-[#FFD34E]" />
+                <span className="truncate max-w-[70px] sm:max-w-[110px]">{student.fullName}</span>
               </button>
               <button
                 onClick={logout}
-                className="p-1.5 text-white/60 hover:text-rose-400 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
+                className="p-1 text-white/60 hover:text-rose-400 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
                 title="Sign Out"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-3.5 h-3.5" />
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
-              {/* Login Pill Button */}
+            <div className="flex items-center gap-1 sm:gap-2">
+              {/* Login Button */}
               <button
                 onClick={() => onOpenAuth(false)}
-                className="px-4 py-1.5 text-xs font-semibold text-white bg-[#65000D]/70 hover:bg-[#970014] border border-[#FFE7A3]/40 rounded-full transition-all cursor-pointer shadow-sm"
+                className="px-2.5 sm:px-3.5 py-1 text-[11px] sm:text-xs font-bold text-white bg-[#65000D] hover:bg-[#970014] border border-[#FFE7A3]/40 rounded-full transition-all cursor-pointer whitespace-nowrap"
               >
                 Login
               </button>
 
-              {/* Register Golden Pill Button */}
+              {/* Register Button */}
               <button
                 onClick={() => onOpenAuth(true)}
-                className="btn-gold-primary px-4 py-1.5 text-xs font-bold rounded-full flex items-center gap-1.5 cursor-pointer"
+                className="btn-gold-primary px-2.5 sm:px-3.5 py-1 text-[11px] sm:text-xs font-black rounded-full flex items-center gap-1 cursor-pointer whitespace-nowrap"
               >
-                <UserPlus className="w-3.5 h-3.5 stroke-[2.5]" />
+                <UserPlus className="w-3 h-3 stroke-[2.5]" />
                 <span>Register</span>
               </button>
             </div>
@@ -200,35 +186,36 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Mobile menu toggle */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden p-2 text-white/80 hover:text-white rounded-lg hover:bg-white/10 cursor-pointer ml-1"
+            className="md:hidden p-1.5 text-white/80 hover:text-white rounded-lg hover:bg-white/10 cursor-pointer"
+            aria-label="Toggle menu"
           >
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
           </button>
         </div>
       </div>
 
       {/* Mobile Drawer Menu */}
       {mobileMenuOpen && (
-        <div className="lg:hidden bg-[#3D0009]/95 backdrop-blur-2xl border-b border-[#FFE7A3]/25 px-5 py-4 space-y-3">
-          <div className="flex flex-col gap-2 text-sm font-semibold text-white">
+        <div className="md:hidden bg-[#240005] border-b border-[#FFE7A3]/20 px-4 py-3 space-y-2">
+          <div className="flex flex-col gap-1 text-xs font-semibold text-white">
             <button
               onClick={() => {
                 setCurrentView('catalog');
                 setMobileMenuOpen(false);
               }}
-              className="text-left py-2 px-3 rounded-lg hover:bg-white/10 text-[#FFE7A3]"
+              className="text-left py-1.5 px-3 rounded-lg hover:bg-white/10 text-[#FFE7A3]"
             >
               Home
             </button>
             <button
               onClick={() => scrollToSection('subjects')}
-              className="text-left py-2 px-3 rounded-lg hover:bg-white/10 text-white/90"
+              className="text-left py-1.5 px-3 rounded-lg hover:bg-white/10 text-white/90"
             >
-              Subjects
+              BCA 3rd Sem Subjects
             </button>
             <button
               onClick={() => scrollToSection('how-it-works')}
-              className="text-left py-2 px-3 rounded-lg hover:bg-white/10 text-white/90"
+              className="text-left py-1.5 px-3 rounded-lg hover:bg-white/10 text-white/90"
             >
               How It Works
             </button>
@@ -237,37 +224,36 @@ export const Navbar: React.FC<NavbarProps> = ({
                 setMobileMenuOpen(false);
                 onOpenAbout();
               }}
-              className="text-left py-2 px-3 rounded-lg hover:bg-white/10 text-white/90"
+              className="text-left py-1.5 px-3 rounded-lg hover:bg-white/10 text-white/90"
             >
-              About
+              About Platform
             </button>
             <button
               onClick={() => {
                 setMobileMenuOpen(false);
                 onOpenContact();
               }}
-              className="text-left py-2 px-3 rounded-lg hover:bg-white/10 text-white/90"
+              className="text-left py-1.5 px-3 rounded-lg hover:bg-white/10 text-white/90"
             >
-              Contact
+              Contact Support
             </button>
             <button
               onClick={() => {
                 setCurrentView('purchased');
                 setMobileMenuOpen(false);
               }}
-              className="text-left py-2 px-3 rounded-lg hover:bg-white/10 text-[#FFD34E] flex items-center gap-2"
+              className="text-left py-1.5 px-3 rounded-lg hover:bg-white/10 text-[#FFD34E]"
             >
-              <ShieldCheck className="w-4 h-4" />
-              <span>Purchased Content</span>
+              Purchased Content
             </button>
             <button
               onClick={() => {
                 setCurrentView('admin');
                 setMobileMenuOpen(false);
               }}
-              className="text-left py-2 px-3 rounded-lg hover:bg-white/10 text-white/50 flex items-center gap-2 text-xs"
+              className="text-left py-1.5 px-3 rounded-lg hover:bg-white/10 text-white/50 flex items-center gap-1.5"
             >
-              <Lock className="w-3.5 h-3.5" />
+              <Lock className="w-3 h-3" />
               <span>Admin Portal</span>
             </button>
           </div>
