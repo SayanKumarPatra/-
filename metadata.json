@@ -1,0 +1,6 @@
+{
+  "name": "BCA STUDY POINT",
+  "description": "Your Exam Preparation Partner - Secure digital question bank platform for BCA students with device binding and continuous scroll reader.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

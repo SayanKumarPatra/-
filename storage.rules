@@ -1,0 +1,18 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Original PDF question banks are strictly private!
+    // No direct client download or public reading permitted.
+    // The server-side service account accesses original files to render watermarked pages.
+    match /pdfs/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.token.admin == true;
+    }
+
+    // Public thumbnail / cover images (if any)
+    match /public/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+  }
+}
