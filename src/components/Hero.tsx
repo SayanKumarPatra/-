@@ -1,6 +1,7 @@
 import React from 'react';
 import { BookOpen, ShieldCheck, Zap, Monitor, ArrowRight } from 'lucide-react';
 import { BRAND } from '../constants/brand';
+import { HeroBannerSlider } from './HeroBannerSlider';
 
 interface HeroProps {
   onExploreClick: () => void;
@@ -8,50 +9,40 @@ interface HeroProps {
 
 export const Hero: React.FC<HeroProps> = ({ onExploreClick }) => {
   return (
-    <section className="relative overflow-hidden pt-6 pb-8 sm:pt-8 sm:pb-10 px-4 sm:px-6 lg:px-8 text-center">
+    <section className="relative overflow-hidden pt-4 pb-6 sm:pt-6 sm:pb-8 px-3 sm:px-6 lg:px-8 text-center">
       {/* Background Ambient Glows */}
       <div className="ambient-glow-crimson w-[380px] h-[380px] -top-24 left-1/2 -translate-x-1/2 opacity-60 pointer-events-none" />
       <div className="ambient-glow-gold w-[320px] h-[320px] top-1/3 left-1/2 -translate-x-1/2 opacity-25 pointer-events-none" />
 
-      <div className="max-w-4xl mx-auto relative z-10 flex flex-col items-center space-y-4">
+      <div className="max-w-4xl mx-auto relative z-10 flex flex-col items-center space-y-3">
         {/* Official Brand Logo */}
-        <div className="relative mb-1 group">
+        <div className="relative mb-0.5 group">
           <img
             src={BRAND.logoUrl}
             alt="BCA STUDY POINT Logo"
-            className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover shadow-[0_0_25px_rgba(255,211,78,0.45)] ring-2 ring-[#FFD34E]/70 transition-transform duration-300 group-hover:scale-105"
+            className="w-14 h-14 sm:w-18 sm:h-18 rounded-full object-cover shadow-[0_0_25px_rgba(255,211,78,0.45)] ring-2 ring-[#FFD34E]/70 transition-transform duration-300 group-hover:scale-105"
           />
           <div className="absolute inset-0 rounded-full ring-1 ring-white/50 pointer-events-none" />
         </div>
 
         {/* Small Glass Badge */}
-        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#65000D]/70 backdrop-blur-md border border-[#FFE7A3]/30 shadow-sm">
-          <BookOpen className="w-3.5 h-3.5 text-[#FFD34E]" />
-          <span className="text-[11px] sm:text-xs font-semibold tracking-wide text-[#FFE7A3]">
-            BCA 3rd Semester · Question Bank &amp; Exam Resources
+        <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#65000D]/70 backdrop-blur-md border border-[#FFE7A3]/30 shadow-xs">
+          <BookOpen className="w-3 h-3 text-[#FFD34E]" />
+          <span className="text-[10px] sm:text-xs font-semibold tracking-wide text-[#FFE7A3]">
+            BCA 3rd Semester · Question Bank Marketplace
           </span>
         </div>
 
-        {/* Headline */}
-        <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-tight text-balance drop-shadow-sm">
-          Complete{' '}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FFE7A3] via-[#FFD34E] to-[#FFF1C2]">
-            BCA 3rd Semester
-          </span>{' '}
-          Question Bank
-        </h1>
+        {/* 1. Interactive Sliding Banner Carousel right below the Logo */}
+        <HeroBannerSlider onExploreClick={onExploreClick} />
 
-        {/* Supporting text */}
-        <div className="text-xs sm:text-sm text-white/85 font-medium max-w-xl mx-auto space-y-1">
-          <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5">
-            <span>Previous Year Questions</span>
-            <span className="text-[#FFD34E]">•</span>
-            <span>Important Questions</span>
-            <span className="text-[#FFD34E]">•</span>
-            <span>Probable Questions</span>
+        {/* Minimal, Clear Descriptive Text (No clutter, straight to the point) */}
+        <div className="text-xs sm:text-sm text-white/90 font-medium max-w-lg mx-auto pt-1">
+          <p className="text-white font-bold text-xs sm:text-sm">
+            University Exam Question Banks &amp; Verified Solved Answers
           </p>
-          <p className="text-[#FFE7A3]/90 text-[11px] sm:text-xs">
-            Core Papers (MAJ, MIN, MDC, SEC, AEC) &amp; Specialization Pack (AI, ML, DS, CS, ITES)
+          <p className="text-[#FFE7A3]/80 text-[11px] sm:text-xs mt-0.5">
+            Select your Core &amp; Specialization subjects below · Pay securely · Read instantly on any device
           </p>
         </div>
 

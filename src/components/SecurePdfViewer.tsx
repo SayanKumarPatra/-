@@ -409,14 +409,14 @@ export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
               style={{ width: `${Math.min(900, (800 * zoomLevel) / 100)}px` }}
               className="relative bg-white rounded-xl shadow-[0_20px_60px_rgba(0,0,0,0.7)] border border-slate-300 overflow-hidden min-h-[500px] flex flex-col transition-all duration-150"
             >
-              {/* Dynamic Watermark Overlay (diagonal 32deg) */}
-              <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden flex flex-col justify-around py-12 px-6 opacity-30 select-none">
-                {[0, 1, 2, 3].map((row) => (
+              {/* Forensic Dynamic Watermark Overlay (dense diagonal 25deg) */}
+              <div className="absolute inset-0 z-20 pointer-events-none overflow-hidden flex flex-col justify-around py-8 px-4 opacity-40 select-none">
+                {[0, 1, 2, 3, 4, 5].map((row) => (
                   <div
                     key={row}
-                    className="transform -rotate-25 whitespace-nowrap text-center text-[11px] font-black tracking-widest text-red-950/50 uppercase font-mono"
+                    className="transform -rotate-25 whitespace-nowrap text-center text-[10px] sm:text-[11px] font-black tracking-widest text-red-950/60 uppercase font-mono select-none"
                   >
-                    BCA STUDY POINT · {student?.fullName} · {student?.email} · ORDER: {manifest?.watermark?.orderId}
+                    BCA STUDY POINT · {student?.fullName} · PH: {student?.mobile || student?.email} · TOKEN: {deviceInfo?.token?.slice(0, 10)} · NO SCREENSHOT
                   </div>
                 ))}
               </div>

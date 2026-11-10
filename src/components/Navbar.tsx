@@ -58,9 +58,15 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           <div className="flex flex-col">
-            <span className="text-xl font-extrabold tracking-tight text-white leading-tight drop-shadow-sm font-sans">
-              BCA STUDY POINT
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xl font-extrabold tracking-tight text-white leading-tight drop-shadow-sm font-sans">
+                BCA STUDY POINT
+              </span>
+              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.2 rounded-full bg-emerald-950/70 border border-emerald-400/40 text-[9px] font-bold text-emerald-300">
+                <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
+                <span>DRM Active</span>
+              </span>
+            </div>
             <span className="text-[11px] font-semibold text-[#FFE7A3] tracking-wide mt-0.5">
               {BRAND.tagline}
             </span>

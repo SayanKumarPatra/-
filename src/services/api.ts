@@ -14,19 +14,34 @@ export function setStoredAdminKey(key: string | null) {
   }
 }
 
+import { FALLBACK_PRODUCTS } from '../constants/fallbackProducts';
+
 export const api = {
   // --- Public Storefront ---
   async getSemesters(): Promise<{ semesters: Semester[] }> {
-    const res = await fetch('/api/semesters');
-    if (!res.ok) throw new Error('Failed to load semesters');
-    return res.json();
+    try {
+      const res = await fetch('/api/semesters');
+      if (!res.ok) throw new Error('Failed to load semesters');
+      return await res.json();
+    } catch {
+      return { semesters: [{ id: 'sem-3', semesterNumber: 3, title: 'BCA Semester 3', academicYear: 'Year 2', description: 'Core and Specialization Question Banks', published: true, createdAt: '', updatedAt: '' }] };
+    }
   },
 
   async getProducts(semesterId?: string): Promise<{ products: Product[] }> {
-    const url = semesterId ? `/api/products?semesterId=${encodeURIComponent(semesterId)}` : '/api/products';
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('Failed to load subjects');
-    return res.json();
+    try {
+      const url = semesterId ? `/api/products?semesterId=${encodeURIComponent(semesterId)}` : '/api/products';
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to load subjects');
+      const data = await res.json();
+      if (data.products && data.products.length > 0) {
+        return data;
+      }
+      return { products: FALLBACK_PRODUCTS };
+    } catch {
+      // Graceful fallback to all 11 BCA 3rd Sem products for static/Vercel/offline deployments
+      return { products: FALLBACK_PRODUCTS };
+    }
   },
 
   async getProduct(id: string): Promise<{ product: Product }> {

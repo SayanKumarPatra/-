@@ -30,11 +30,11 @@ export const SemesterSelector: React.FC<SemesterSelectorProps> = ({
         Select your required 3rd semester core papers and specialization modules.
       </p>
 
-      {/* Category Filter Pills (Only for BCA Semester 3) */}
-      <div className="inline-flex items-center p-1 rounded-full bg-black/35 border border-[#FFE7A3]/30 backdrop-blur-md shadow-sm">
+      {/* Category Filter Pills (Only for BCA Semester 3 - Responsive on all screen sizes) */}
+      <div className="inline-flex max-w-[96vw] overflow-x-auto items-center p-1 rounded-full bg-black/45 border border-[#FFE7A3]/30 backdrop-blur-md shadow-sm">
         <button
           onClick={() => onSelectCategory('all')}
-          className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+          className={`px-3 sm:px-4 py-1.5 rounded-full text-[11px] sm:text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
             activeCategory === 'all'
               ? 'btn-gold-primary shadow-[0_0_15px_rgba(255,211,78,0.35)]'
               : 'text-white/80 hover:text-white'
@@ -45,7 +45,7 @@ export const SemesterSelector: React.FC<SemesterSelectorProps> = ({
 
         <button
           onClick={() => onSelectCategory('core')}
-          className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+          className={`px-3 sm:px-4 py-1.5 rounded-full text-[11px] sm:text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
             activeCategory === 'core'
               ? 'btn-gold-primary shadow-[0_0_15px_rgba(255,211,78,0.35)]'
               : 'text-white/80 hover:text-white'
@@ -56,7 +56,7 @@ export const SemesterSelector: React.FC<SemesterSelectorProps> = ({
 
         <button
           onClick={() => onSelectCategory('specialization')}
-          className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+          className={`px-3 sm:px-4 py-1.5 rounded-full text-[11px] sm:text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
             activeCategory === 'specialization'
               ? 'btn-gold-primary shadow-[0_0_15px_rgba(255,211,78,0.35)]'
               : 'text-white/80 hover:text-white'

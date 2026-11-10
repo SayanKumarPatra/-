@@ -26,12 +26,12 @@ export const SecurityBenefits: React.FC = () => {
   ];
 
   return (
-    <section className="py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-      <div className="liquid-glass-master rounded-2xl p-6 sm:p-8 relative overflow-hidden">
+    <section className="py-2 sm:py-3 px-3 sm:px-6 lg:px-8 max-w-5xl mx-auto">
+      <div className="liquid-glass-master rounded-xl p-3 sm:p-4 relative overflow-hidden">
         {/* Glowing Ambient Accent */}
-        <div className="absolute inset-x-12 top-0 h-[1px] bg-gradient-to-r from-transparent via-[#FFD34E]/60 to-transparent pointer-events-none" />
+        <div className="absolute inset-x-8 top-0 h-[1px] bg-gradient-to-r from-transparent via-[#FFD34E]/60 to-transparent pointer-events-none" />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 divide-y sm:divide-y-0 sm:divide-x divide-white/15">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 divide-y sm:divide-y-0 sm:divide-x divide-white/10">
           {benefits.map((item, idx) => {
             const Icon = item.icon;
             return (

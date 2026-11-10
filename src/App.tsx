@@ -19,8 +19,11 @@ import { AdminPanel } from './components/AdminPanel';
 import { AuthModal } from './components/AuthModal';
 import { AboutModal } from './components/AboutModal';
 import { ContactModal } from './components/ContactModal';
+import { SecurityGuard } from './components/SecurityGuard';
+import { SecurityGateModal } from './components/SecurityGateModal';
 import { Footer } from './components/Footer';
 import { api } from './services/api';
+import { FALLBACK_PRODUCTS } from './constants/fallbackProducts';
 import type { Product } from './types';
 
 function AppContent() {
@@ -29,10 +32,10 @@ function AppContent() {
   // Navigation View
   const [currentView, setCurrentView] = useState<'catalog' | 'purchased' | 'admin'>('catalog');
 
-  // Catalog State
-  const [products, setProducts] = useState<Product[]>([]);
+  // Catalog State - Initialized with default 11 BCA 3rd Sem products to eliminate loading spinners or retry errors
+  const [products, setProducts] = useState<Product[]>(FALLBACK_PRODUCTS);
   const [activeCategory, setActiveCategory] = useState<'all' | 'core' | 'specialization'>('all');
-  const [isLoadingCatalog, setIsLoadingCatalog] = useState(true);
+  const [isLoadingCatalog, setIsLoadingCatalog] = useState(false);
   const [catalogError, setCatalogError] = useState('');
 
   // Cart & Selection State
@@ -52,6 +55,19 @@ function AppContent() {
   const [authDefaultRegister, setAuthDefaultRegister] = useState(false);
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+  const [isSecurityGateOpen, setIsSecurityGateOpen] = useState(false);
+
+  // Check if DRM security policy has been authorized
+  useEffect(() => {
+    try {
+      const accepted = localStorage.getItem('bca_drm_protection_accepted');
+      if (!accepted) {
+        setIsSecurityGateOpen(true);
+      }
+    } catch {
+      setIsSecurityGateOpen(true);
+    }
+  }, []);
 
   // Load catalog on mount
   const loadCatalog = async () => {
@@ -264,6 +280,19 @@ function AppContent() {
         isOpen={isContactModalOpen}
         onClose={() => setIsContactModalOpen(false)}
       />
+
+      {/* Mandatory Anti-Piracy & Anti-Screenshot Security Gate Modal */}
+      <SecurityGateModal
+        isOpen={isSecurityGateOpen}
+        onAccept={() => {
+          try {
+            localStorage.setItem('bca_drm_protection_accepted', 'true');
+          } catch {
+            // ignore
+          }
+          setIsSecurityGateOpen(false);
+        }}
+      />
     </div>
   );
 }
@@ -271,7 +300,9 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <SecurityGuard>
+        <AppContent />
+      </SecurityGuard>
     </AuthProvider>
   );
 }
