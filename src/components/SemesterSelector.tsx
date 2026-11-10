@@ -1,62 +1,69 @@
 import React from 'react';
-import type { Semester } from '../types';
 
 interface SemesterSelectorProps {
-  semesters: Semester[];
-  activeSemesterId: string | 'all';
-  onSelectSemester: (id: string | 'all') => void;
-  getSubjectCountForSemester: (semId: string) => number;
+  activeCategory: 'all' | 'core' | 'specialization';
+  onSelectCategory: (cat: 'all' | 'core' | 'specialization') => void;
+  coreCount: number;
+  specializationCount: number;
+  totalCount: number;
 }
 
 export const SemesterSelector: React.FC<SemesterSelectorProps> = ({
-  semesters,
-  activeSemesterId,
-  onSelectSemester,
+  activeCategory,
+  onSelectCategory,
+  coreCount,
+  specializationCount,
+  totalCount,
 }) => {
   return (
-    <div id="subjects" className="pt-8 pb-4 text-center">
+    <div id="subjects" className="pt-4 pb-2 text-center">
       {/* Title with decorative glowing horizontal light beams */}
-      <div className="flex items-center justify-center gap-4 mb-2">
-        <div className="h-[1.5px] w-12 sm:w-20 bg-gradient-to-r from-transparent via-[#FFD34E] to-white/70" />
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight drop-shadow-sm">
-          Browse <span className="font-serif italic font-normal text-[#FFE7A3]">by</span> Semester
+      <div className="flex items-center justify-center gap-3 mb-1.5">
+        <div className="h-[1.5px] w-8 sm:w-16 bg-gradient-to-r from-transparent via-[#FFD34E] to-white/70" />
+        <h2 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white tracking-tight drop-shadow-sm">
+          BCA 3rd Semester – <span className="font-serif italic font-normal text-[#FFE7A3]">Subjects &amp; Resources</span>
         </h2>
-        <div className="h-[1.5px] w-12 sm:w-20 bg-gradient-to-l from-transparent via-[#FFD34E] to-white/70" />
+        <div className="h-[1.5px] w-8 sm:w-16 bg-gradient-to-l from-transparent via-[#FFD34E] to-white/70" />
       </div>
 
-      <p className="text-xs sm:text-sm text-white/80 font-medium max-w-md mx-auto mb-6">
-        Select your semester and choose the subjects you need.
+      <p className="text-xs text-white/75 font-medium max-w-md mx-auto mb-4">
+        Select your required 3rd semester core papers and specialization modules.
       </p>
 
-      {/* Glass Semester Buttons */}
-      <div className="flex items-center justify-center gap-2 sm:gap-3 flex-wrap max-w-4xl mx-auto px-2">
+      {/* Category Filter Pills (Only for BCA Semester 3) */}
+      <div className="inline-flex items-center p-1 rounded-full bg-black/35 border border-[#FFE7A3]/30 backdrop-blur-md shadow-sm">
         <button
-          onClick={() => onSelectSemester('all')}
-          className={`px-5 py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
-            activeSemesterId === 'all'
-              ? 'btn-gold-primary shadow-[0_0_20px_rgba(255,211,78,0.5)]'
-              : 'bg-[#65000D]/60 hover:bg-[#970014]/70 text-white/90 hover:text-white border border-[#FFE7A3]/30 backdrop-blur-md shadow-sm'
+          onClick={() => onSelectCategory('all')}
+          className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            activeCategory === 'all'
+              ? 'btn-gold-primary shadow-[0_0_15px_rgba(255,211,78,0.35)]'
+              : 'text-white/80 hover:text-white'
           }`}
         >
-          All Semesters
+          All Subjects ({totalCount})
         </button>
 
-        {semesters.map((sem) => {
-          const isActive = activeSemesterId === sem.id;
-          return (
-            <button
-              key={sem.id}
-              onClick={() => onSelectSemester(sem.id)}
-              className={`px-5 py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
-                isActive
-                  ? 'btn-gold-primary shadow-[0_0_20px_rgba(255,211,78,0.5)]'
-                  : 'bg-[#65000D]/60 hover:bg-[#970014]/70 text-white/90 hover:text-white border border-[#FFE7A3]/30 backdrop-blur-md shadow-sm'
-              }`}
-            >
-              <span>{sem.title}</span>
-            </button>
-          );
-        })}
+        <button
+          onClick={() => onSelectCategory('core')}
+          className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            activeCategory === 'core'
+              ? 'btn-gold-primary shadow-[0_0_15px_rgba(255,211,78,0.35)]'
+              : 'text-white/80 hover:text-white'
+          }`}
+        >
+          Core Papers ({coreCount})
+        </button>
+
+        <button
+          onClick={() => onSelectCategory('specialization')}
+          className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            activeCategory === 'specialization'
+              ? 'btn-gold-primary shadow-[0_0_15px_rgba(255,211,78,0.35)]'
+              : 'text-white/80 hover:text-white'
+          }`}
+        >
+          Specialization Pack ({specializationCount})
+        </button>
       </div>
     </div>
   );

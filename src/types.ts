@@ -9,8 +9,6 @@ export interface Semester {
   academicYear: string; // e.g. "Year 1", "Year 2", "Year 3"
   description: string;
   published: boolean;
-  coverImageUrl?: string;
-  paperType?: 'core' | 'specialization';
   createdAt: string;
   updatedAt: string;
 }
@@ -29,6 +27,8 @@ export interface Product {
   fileSizeKb: number;
   published: boolean;
   examYear: string; // e.g. "2024-2025 Edition"
+  coverImageUrl?: string;
+  paperType?: 'core' | 'specialization';
   createdAt: string;
   updatedAt: string;
 }

@@ -47,6 +47,8 @@ productsRouter.get('/products', (req, res) => {
       pageCount: p.pageCount,
       fileSizeKb: p.fileSizeKb,
       examYear: p.examYear,
+      coverImageUrl: p.coverImageUrl,
+      paperType: p.paperType,
       published: p.published,
       updatedAt: p.updatedAt,
     }));

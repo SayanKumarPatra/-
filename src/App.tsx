@@ -21,7 +21,7 @@ import { AboutModal } from './components/AboutModal';
 import { ContactModal } from './components/ContactModal';
 import { Footer } from './components/Footer';
 import { api } from './services/api';
-import type { Semester, Product } from './types';
+import type { Product } from './types';
 
 function AppContent() {
   const { student } = useAuth();
@@ -30,9 +30,8 @@ function AppContent() {
   const [currentView, setCurrentView] = useState<'catalog' | 'purchased' | 'admin'>('catalog');
 
   // Catalog State
-  const [semesters, setSemesters] = useState<Semester[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [activeSemesterId, setActiveSemesterId] = useState<string | 'all'>('sem-1');
+  const [activeCategory, setActiveCategory] = useState<'all' | 'core' | 'specialization'>('all');
   const [isLoadingCatalog, setIsLoadingCatalog] = useState(true);
   const [catalogError, setCatalogError] = useState('');
 
@@ -59,16 +58,8 @@ function AppContent() {
     setIsLoadingCatalog(true);
     setCatalogError('');
     try {
-      const [semRes, prodRes] = await Promise.all([
-        api.getSemesters(),
-        api.getProducts(),
-      ]);
-      setSemesters(semRes.semesters);
+      const prodRes = await api.getProducts();
       setProducts(prodRes.products);
-      if (semRes.semesters.length > 0 && activeSemesterId === 'sem-1') {
-        const hasSem1 = semRes.semesters.some((s) => s.id === 'sem-1');
-        if (!hasSem1) setActiveSemesterId(semRes.semesters[0].id);
-      }
     } catch (err: any) {
       console.error('Error loading storefront catalog:', err);
       setCatalogError(err.message || 'Failed to load question banks');
@@ -117,18 +108,18 @@ function AppContent() {
   };
 
   // Filtered products calculation
-  const filteredProducts = useMemo(() => {
-    return products.filter((prod) => {
-      if (activeSemesterId !== 'all' && prod.semesterId !== activeSemesterId) {
-        return false;
-      }
-      return true;
-    });
-  }, [products, activeSemesterId]);
+  const coreCount = useMemo(() => products.filter((p) => p.paperType === 'core').length, [products]);
+  const specializationCount = useMemo(() => products.filter((p) => p.paperType === 'specialization').length, [products]);
 
-  const activeSemester = useMemo(() => {
-    return semesters.find((s) => s.id === activeSemesterId);
-  }, [semesters, activeSemesterId]);
+  const filteredProducts = useMemo(() => {
+    if (activeCategory === 'core') {
+      return products.filter((prod) => prod.paperType === 'core');
+    }
+    if (activeCategory === 'specialization') {
+      return products.filter((prod) => prod.paperType === 'specialization');
+    }
+    return products;
+  }, [products, activeCategory]);
 
   const selectedProducts = useMemo(() => {
     return products.filter((p) => selectedProductIds.includes(p.id));
@@ -137,10 +128,6 @@ function AppContent() {
   const totalPrice = useMemo(() => {
     return selectedProducts.reduce((sum, p) => sum + p.price, 0);
   }, [selectedProducts]);
-
-  const getSubjectCountForSemester = (semId: string) => {
-    return products.filter((p) => p.semesterId === semId).length;
-  };
 
   // If Admin portal is open, render AdminPanel
   if (currentView === 'admin') {
@@ -184,18 +171,19 @@ function AppContent() {
               }}
             />
 
-            {/* 2. Browse by Semester Selector */}
+            {/* 2. Category Filter (Core Papers vs Specialization Pack for BCA 3rd Sem) */}
             <SemesterSelector
-              semesters={semesters}
-              activeSemesterId={activeSemesterId}
-              onSelectSemester={setActiveSemesterId}
-              getSubjectCountForSemester={getSubjectCountForSemester}
+              activeCategory={activeCategory}
+              onSelectCategory={setActiveCategory}
+              coreCount={coreCount}
+              specializationCount={specializationCount}
+              totalCount={products.length}
             />
 
             {/* 3. Master Liquid Glass Subject Catalog Container */}
             <SubjectCatalog
               products={filteredProducts}
-              activeSemester={activeSemester}
+              activeCategory={activeCategory}
               selectedProductIds={selectedProductIds}
               purchasedProductIds={purchasedProductIds}
               totalPrice={totalPrice}
