@@ -8,6 +8,8 @@ import { viewerRouter } from './server/routes/viewer';
 import { adminRouter } from './server/routes/admin';
 import { authRouter } from './server/routes/auth';
 import { pdfService } from './server/pdfService';
+import { firebaseSync } from './server/firebaseSync';
+import { db } from './server/db';
 
 dotenv.config();
 
@@ -34,6 +36,10 @@ async function startServer() {
   try {
     await pdfService.initializeSeedPdfs();
     console.log('Seed question bank PDFs initialized successfully in private storage.');
+    // Realtime sync all 11 products to Firebase Realtime Database
+    firebaseSync.syncProducts(db.getProducts()).catch((e) => {
+      console.warn('Firebase RTDB boot sync warning:', e?.message || e);
+    });
   } catch (err) {
     console.error('Error initializing seed question banks:', err);
   }

@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { UserCheck, LogOut, Lock, UserPlus, Menu, X, ShoppingBag } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { BRAND } from '../constants/brand';
+import type { AppView } from '../types';
 
 interface NavbarProps {
-  currentView: 'catalog' | 'purchased' | 'admin';
-  setCurrentView: (view: 'catalog' | 'purchased' | 'admin') => void;
+  currentView: AppView;
+  setCurrentView: (view: AppView) => void;
   selectedCount: number;
   onOpenCart: () => void;
   onOpenAuth: (isRegister?: boolean) => void;
@@ -107,18 +108,22 @@ export const Navbar: React.FC<NavbarProps> = ({
             Contact
           </button>
 
-          {isLoggedIn && (
-            <button
-              onClick={() => setCurrentView('purchased')}
-              className={`px-3 py-1.5 rounded-full flex items-center gap-1 transition-all cursor-pointer ${
-                currentView === 'purchased'
-                  ? 'bg-[#970014] text-[#FFE7A3] border border-[#FFD34E]/50'
-                  : 'text-[#FFE7A3] hover:text-white hover:bg-white/10'
-              }`}
-            >
-              Purchased Content
-            </button>
-          )}
+          <button
+            onClick={() => {
+              if (isLoggedIn) {
+                setCurrentView('purchased');
+              } else {
+                onOpenAuth();
+              }
+            }}
+            className={`px-3 py-1.5 rounded-full flex items-center gap-1 transition-all cursor-pointer ${
+              currentView === 'purchased'
+                ? 'bg-[#970014] text-[#FFE7A3] border border-[#FFD34E]/50 font-bold'
+                : 'text-[#FFE7A3] hover:text-white hover:bg-white/10'
+            }`}
+          >
+            My Notes
+          </button>
 
           <button
             onClick={() => setCurrentView('admin')}

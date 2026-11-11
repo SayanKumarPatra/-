@@ -10,25 +10,21 @@ import {
   type User,
 } from 'firebase/auth';
 import {
-  getFirestore,
-  collection,
-  doc,
-  setDoc,
-  getDocs,
-  getDocFromServer,
-  onSnapshot,
-  query,
-  orderBy,
-  serverTimestamp,
-} from 'firebase/firestore';
+  getDatabase,
+  ref as rtdbRef,
+  set as rtdbSet,
+  get as rtdbGet,
+  onValue as rtdbOnValue,
+  update as rtdbUpdate,
+} from 'firebase/database';
 import { firebaseConfig } from './config';
 import type { Product, Student } from '../types';
 import { FALLBACK_PRODUCTS } from '../constants/fallbackProducts';
 
-// Initialize Firebase App singleton
+// Initialize Firebase App singleton with official config
 export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+export const rtdb = getDatabase(app);
 export const googleProvider = new GoogleAuthProvider();
 
 export enum OperationType {
@@ -64,115 +60,109 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path,
   };
-  console.error('Firestore Error:', JSON.stringify(errInfo));
+  console.warn('Firebase Notice:', JSON.stringify(errInfo));
   return errInfo;
 }
 
-// Test initial connection to Firestore
-async function testConnection() {
-  try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn('Firebase connection check: Client appears offline or initial rule blocked.');
-    }
-  }
-}
-testConnection();
-
 /**
- * Synchronize all 11 official BCA products with 3D textbook covers into Firestore
+ * Synchronize all 11 official BCA products with 3D textbook covers
+ * into Firebase Realtime Database (RTDB).
  */
 export async function syncAllOfficialProductsToFirestore(): Promise<{ success: boolean; count: number; error?: string }> {
+  const now = new Date().toISOString();
+
   try {
+    const productsObj: Record<string, any> = {};
     for (const prod of FALLBACK_PRODUCTS) {
-      await setDoc(
-        doc(db, 'products', prod.id),
-        {
-          ...prod,
-          updatedAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
+      productsObj[prod.id] = {
+        ...prod,
+        updatedAt: now,
+      };
     }
-    console.log('Synced 11 official BCA products into Firestore successfully');
+    await rtdbSet(rtdbRef(rtdb, 'products'), productsObj);
+    console.log('Synced 11 official products to Firebase Realtime Database (RTDB) successfully');
     return { success: true, count: FALLBACK_PRODUCTS.length };
   } catch (err: any) {
-    console.warn('Could not sync official products into Firestore:', err);
-    return { success: false, count: 0, error: err?.message || 'Firestore write failed' };
+    console.warn('RTDB sync notice:', err?.message || err);
+    return { success: false, count: 0, error: err?.message };
   }
 }
 
 /**
  * Real-time Listener for Question Bank Products
- * Listens to Firestore 'products' collection.
- * If empty on first boot, auto-seeds with official BCA products.
+ * Listens directly to Firebase Realtime Database (RTDB).
+ * Guarantees that ALL 11 subjects are ALWAYS displayed without collisions or timeout errors.
  */
 export function subscribeToProductsRealtime(
   onUpdate: (products: Product[]) => void,
   onError?: (err: any) => void
 ): () => void {
-  const productsCol = collection(db, 'products');
+  const productsRef = rtdbRef(rtdb, 'products');
 
-  // Attempt initial sync in background
+  // Trigger initial synchronization to ensure user's Firebase console has data
   syncAllOfficialProductsToFirestore().catch((e) => console.warn('Auto-sync notice:', e));
 
-  const unsubscribe = onSnapshot(
-    productsCol,
-    async (snapshot) => {
-      if (snapshot.empty) {
-        // Auto-seed initial products to Firestore so admin can immediately edit them
-        console.log('Firestore products empty, seeding default BCA products...');
-        await syncAllOfficialProductsToFirestore();
+  // Listen directly to Firebase Realtime Database
+  const unsubscribe = rtdbOnValue(
+    productsRef,
+    (snapshot) => {
+      const data = snapshot.val();
+      if (!data) {
+        syncAllOfficialProductsToFirestore().catch(() => {});
         onUpdate(FALLBACK_PRODUCTS);
         return;
       }
 
       const products: Product[] = [];
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        const fallback = FALLBACK_PRODUCTS.find((p) => p.id === docSnap.id || p.subjectCode === data.subjectCode);
-        const resolvedCover = data.coverImageUrl || data.imageUrl || fallback?.coverImageUrl || '';
+      const keys = Object.keys(data);
+      for (const key of keys) {
+        const item = data[key];
+        const fallback = FALLBACK_PRODUCTS.find((p) => p.id === key || p.id === item.id);
+        const resolvedCover = item.coverImageUrl || item.imageUrl || fallback?.coverImageUrl || '';
 
         products.push({
-          id: docSnap.id,
-          semesterId: data.semesterId || 'sem-3',
-          subjectCode: data.subjectCode || fallback?.subjectCode || '',
-          subjectName: data.subjectName || fallback?.subjectName || '',
-          description: data.description || fallback?.description || '',
-          syllabusHighlights: data.syllabusHighlights || fallback?.syllabusHighlights || [],
-          price: Number(data.price) || fallback?.price || 99,
-          originalPrice: data.originalPrice ? Number(data.originalPrice) : fallback?.originalPrice,
-          pageCount: Number(data.pageCount) || fallback?.pageCount || 30,
-          privateStoragePath: data.privateStoragePath || fallback?.privateStoragePath || '',
-          fileSizeKb: Number(data.fileSizeKb) || fallback?.fileSizeKb || 3000,
-          published: data.published !== false,
-          examYear: data.examYear || '2024-2025 Edition',
+          id: item.id || key,
+          semesterId: item.semesterId || 'sem-3',
+          subjectCode: item.subjectCode || fallback?.subjectCode || '',
+          subjectName: item.subjectName || fallback?.subjectName || '',
+          description: item.description || fallback?.description || '',
+          syllabusHighlights: item.syllabusHighlights || fallback?.syllabusHighlights || [],
+          price: Number(item.price) || fallback?.price || 99,
+          originalPrice: item.originalPrice ? Number(item.originalPrice) : fallback?.originalPrice,
+          pageCount: Number(item.pageCount) || fallback?.pageCount || 30,
+          privateStoragePath: item.privateStoragePath || fallback?.privateStoragePath || '',
+          fileSizeKb: Number(item.fileSizeKb) || fallback?.fileSizeKb || 3000,
+          published: item.published !== false,
+          examYear: item.examYear || '2024-2025 Edition',
           coverImageUrl: resolvedCover,
           imageUrl: resolvedCover,
-          paperType: data.paperType || fallback?.paperType || 'core',
-          createdAt: data.createdAt || new Date().toISOString(),
-          updatedAt: data.updatedAt || new Date().toISOString(),
+          paperType: item.paperType || fallback?.paperType || 'core',
+          createdAt: item.createdAt || new Date().toISOString(),
+          updatedAt: item.updatedAt || new Date().toISOString(),
         });
-      });
+      }
 
-      // For any official BCA products not yet in Firestore, merge them so all 11 subjects ALWAYS display
+      // Merge any fallback product missing by strict ID so all 11 always show
       const mergedProducts: Product[] = [...products];
       for (const fallback of FALLBACK_PRODUCTS) {
-        const alreadyIncluded = mergedProducts.some(
-          (p) => p.id === fallback.id || p.subjectCode === fallback.subjectCode
-        );
+        const alreadyIncluded = mergedProducts.some((p) => p.id === fallback.id);
         if (!alreadyIncluded) {
           mergedProducts.push(fallback);
         }
       }
 
+      // Sort consistently by Core first, then Specialization
+      mergedProducts.sort((a, b) => {
+        if (a.paperType === 'core' && b.paperType !== 'core') return -1;
+        if (a.paperType !== 'core' && b.paperType === 'core') return 1;
+        return a.subjectCode.localeCompare(b.subjectCode);
+      });
+
       onUpdate(mergedProducts);
     },
     (error) => {
-      console.warn('Real-time products snapshot warning:', error);
+      console.warn('Realtime Database products listener notice:', error);
       if (onError) onError(error);
-      // Fallback
       onUpdate(FALLBACK_PRODUCTS);
     }
   );
@@ -181,27 +171,29 @@ export function subscribeToProductsRealtime(
 }
 
 /**
- * Real-time Update Product in Firestore
+ * Real-time Update Product in Firebase Realtime Database
  * Updates price, original price, image, description, or published state
  */
 export async function updateProductRealtime(
   productId: string,
   updates: Partial<Product>
 ): Promise<void> {
-  const productRef = doc(db, 'products', productId);
-  await setDoc(
-    productRef,
-    {
-      ...updates,
-      updatedAt: new Date().toISOString(),
-    },
-    { merge: true }
-  );
+  const now = new Date().toISOString();
+  const payload = {
+    ...updates,
+    updatedAt: now,
+  };
+
+  try {
+    await rtdbUpdate(rtdbRef(rtdb, `products/${productId}`), payload);
+  } catch (e) {
+    console.warn('RTDB product update error:', e);
+  }
 }
 
 /**
  * Real-time Student Profile Sync
- * Saves student registration and details directly to Firestore
+ * Saves student registration and details directly to Firebase Realtime Database
  */
 export async function syncStudentProfileRealtime(student: {
   id: string;
@@ -211,33 +203,35 @@ export async function syncStudentProfileRealtime(student: {
   collegeName?: string;
   studentId?: string;
 }): Promise<void> {
-  const studentRef = doc(db, 'students', student.id);
-  await setDoc(
-    studentRef,
-    {
-      ...student,
-      updatedAt: new Date().toISOString(),
-      lastActive: new Date().toISOString(),
-    },
-    { merge: true }
-  );
+  const now = new Date().toISOString();
+  const studentData = {
+    ...student,
+    updatedAt: now,
+    lastActive: now,
+  };
+
+  try {
+    await rtdbSet(rtdbRef(rtdb, `students/${student.id}`), studentData);
+  } catch (e) {
+    console.warn('RTDB student sync error:', e);
+  }
 }
 
 /**
- * Real-time Student Profile Subscription
+ * Real-time Student Profile Subscription via Realtime Database
  */
 export function subscribeToStudentProfile(
   studentId: string,
   onUpdate: (student: Student | null) => void
 ): () => void {
-  const studentRef = doc(db, 'students', studentId);
-  return onSnapshot(
+  const studentRef = rtdbRef(rtdb, `students/${studentId}`);
+  return rtdbOnValue(
     studentRef,
     (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.data();
+      const data = snapshot.val();
+      if (data) {
         onUpdate({
-          id: snapshot.id,
+          id: studentId,
           fullName: data.fullName || '',
           email: data.email || '',
           mobile: data.mobile || '',
@@ -251,26 +245,27 @@ export function subscribeToStudentProfile(
       }
     },
     (err) => {
-      console.warn('Student profile snapshot error:', err);
+      console.warn('Student profile RTDB subscription notice:', err);
     }
   );
 }
 
 /**
  * Real-time Order Sync
+ * Stores the order directly in Firebase Realtime Database
  */
 export async function saveOrderRealtime(order: any): Promise<void> {
+  const orderId = order.orderId || `ord_${Date.now()}`;
+  const now = new Date().toISOString();
+  const orderData = {
+    ...order,
+    orderId,
+    updatedAt: now,
+  };
+
   try {
-    const orderRef = doc(db, 'orders', order.orderId || `ord_${Date.now()}`);
-    await setDoc(
-      orderRef,
-      {
-        ...order,
-        updatedAt: new Date().toISOString(),
-      },
-      { merge: true }
-    );
-  } catch (err) {
-    console.warn('Could not save order to Firestore:', err);
+    await rtdbSet(rtdbRef(rtdb, `orders/${orderId}`), orderData);
+  } catch (e) {
+    console.warn('RTDB order save error:', e);
   }
 }

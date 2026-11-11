@@ -327,6 +327,22 @@ adminRouter.post('/orders/:orderId/reject', requireAdmin, (req, res) => {
   }
 });
 
+adminRouter.delete('/orders/:orderId', requireAdmin, (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const result = db.deleteOrder(orderId, 'admin');
+    if (!result.success) {
+      return res.status(404).json({ success: false, error: result.error });
+    }
+    res.json({
+      success: true,
+      message: `Order ${orderId} deleted successfully.`,
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // --- DEVICE MANAGEMENT & ADMIN DEVICE RESET ---
 
 adminRouter.get('/devices', requireAdmin, (req, res) => {

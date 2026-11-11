@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Lock,
   LayoutDashboard,
@@ -18,6 +18,8 @@ import {
   Edit3,
   Image,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { api, getStoredAdminKey, setStoredAdminKey } from '../services/api';
 import { BRAND } from '../constants/brand';
@@ -373,6 +375,28 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
     }
   };
 
+  const handleDeleteOrder = async (orderId: string, studentName: string) => {
+    if (!window.confirm(`আপনি কি নিশ্চিত যে অর্ডার "${orderId}" (${studentName}) স্থায়ীভাবে মুছে ফেলতে চান? এটি Firebase ও সিস্টেম ডেটাবেস উভয় স্থান থেকেই মুছে ফেলা হবে।`)) {
+      return;
+    }
+    try {
+      await api.deleteOrder(orderId);
+      showSuccessBanner(`✓ অর্ডার ${orderId} সফলভাবে মুছে ফেলা হয়েছে!`);
+      loadAllAdminData();
+    } catch (err: any) {
+      alert(err.message || 'অর্ডার মুছতে সমস্যা হয়েছে');
+    }
+  };
+
+  const tabsContainerRef = useRef<HTMLDivElement>(null);
+
+  const scrollTabs = (direction: 'left' | 'right') => {
+    if (tabsContainerRef.current) {
+      const scrollAmount = direction === 'left' ? -220 : 220;
+      tabsContainerRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-b from-[#65000D] via-[#3D0009] to-[#240005]">
@@ -396,25 +420,13 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
             )}
             <div>
               <input
-                type="text"
+                type="password"
                 required
                 value={loginInput}
                 onChange={(e) => setLoginInput(e.target.value)}
-                placeholder="পাসওয়ার্ড লিখুন (যেমন: 152006)"
-                className="w-full px-4 py-2.5 text-xs bg-black/40 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-[#FFD34E] font-mono tracking-wider"
+                placeholder="Enter Secret Key"
+                className="w-full px-4 py-2.5 text-xs bg-black/40 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-[#FFD34E] font-mono tracking-widest text-center"
               />
-              <p className="text-[11px] text-[#FFE7A3]/70 text-left mt-1.5 flex items-center justify-between">
-                <span>অ্যাডমিন পাসওয়ার্ড: <strong className="text-[#FFD34E]">152006</strong></span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLoginInput('152006');
-                  }}
-                  className="text-[10px] text-[#FFD34E] hover:underline cursor-pointer font-bold"
-                >
-                  (এখানে ক্লিক করে অটো বসান)
-                </button>
-              </p>
             </div>
 
             <button
@@ -490,34 +502,57 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
 
       {/* Main Admin Workspace */}
       <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* Navigation Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-2 border-b border-white/15">
-          {[
-            { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-            { id: 'semesters', label: 'Manage Semesters', icon: Layers },
-            { id: 'subjects', label: 'Subjects & PDFs', icon: BookOpen },
-            { id: 'orders', label: 'Orders & Sales', icon: ShoppingBag },
-            { id: 'devices', label: 'Device Binding & Resets', icon: Laptop },
-            { id: 'audit', label: 'Security Audit Logs', icon: History },
-            { id: 'config', label: 'Firebase & Gateway Rules', icon: Code2 },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-full transition-all whitespace-nowrap cursor-pointer ${
-                  isActive
-                    ? 'btn-gold-primary shadow-[0_0_15px_rgba(255,211,78,0.4)]'
-                    : 'bg-black/30 text-white/80 hover:text-white border border-white/15 hover:border-white/30'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
+        {/* Navigation Tabs with Horizontal Scroll Controls */}
+        <div className="relative flex items-center gap-1.5 pb-2 border-b border-white/15">
+          <button
+            type="button"
+            onClick={() => scrollTabs('left')}
+            className="p-2 rounded-full bg-black/40 hover:bg-black/70 border border-white/20 text-[#FFE7A3] hover:text-white shrink-0 transition-colors shadow-sm cursor-pointer"
+            title="Scroll tabs left"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+
+          <div
+            ref={tabsContainerRef}
+            className="flex-1 flex items-center gap-2 overflow-x-auto scroll-smooth py-1 px-1 scrollbar-thin"
+          >
+            {[
+              { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+              { id: 'semesters', label: 'Manage Semesters', icon: Layers },
+              { id: 'subjects', label: 'Subjects & PDFs', icon: BookOpen },
+              { id: 'orders', label: 'Orders & Sales', icon: ShoppingBag },
+              { id: 'devices', label: 'Device Binding & Resets', icon: Laptop },
+              { id: 'audit', label: 'Security Audit Logs', icon: History },
+              { id: 'config', label: 'Firebase & Gateway Rules', icon: Code2 },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-full transition-all whitespace-nowrap cursor-pointer shrink-0 ${
+                    isActive
+                      ? 'btn-gold-primary shadow-[0_0_15px_rgba(255,211,78,0.4)]'
+                      : 'bg-black/30 text-white/80 hover:text-white border border-white/15 hover:border-white/30'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => scrollTabs('right')}
+            className="p-2 rounded-full bg-black/40 hover:bg-black/70 border border-white/20 text-[#FFE7A3] hover:text-white shrink-0 transition-colors shadow-sm cursor-pointer"
+            title="Scroll tabs right"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Tab 1: Dashboard Overview */}
@@ -1039,38 +1074,50 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
                           })}
                         </td>
                         <td className="p-3.5 text-center whitespace-nowrap">
-                          {o.paymentStatus === 'pending' ? (
-                            <div className="flex items-center justify-center gap-1.5">
+                          <div className="flex items-center justify-center gap-2">
+                            {o.paymentStatus === 'pending' ? (
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  onClick={() => handleApproveOrder(o.orderId)}
+                                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full text-[11px] font-black flex items-center gap-1 shadow-sm transition-colors cursor-pointer"
+                                  title="Approve payment & unlock PDF access"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>Approve Access</span>
+                                </button>
+                                <button
+                                  onClick={() => handleRejectOrder(o.orderId)}
+                                  className="px-2.5 py-1 bg-rose-600/80 hover:bg-rose-600 text-white rounded-full text-[11px] font-bold transition-colors cursor-pointer"
+                                  title="Reject order"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                  <span>Reject</span>
+                                </button>
+                              </div>
+                            ) : o.paymentStatus === 'verified' ? (
+                              <div className="flex items-center justify-center gap-1 text-emerald-400 font-bold text-[11px]">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                                <span>Granted</span>
+                              </div>
+                            ) : (
                               <button
                                 onClick={() => handleApproveOrder(o.orderId)}
-                                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full text-[11px] font-black flex items-center gap-1 shadow-sm transition-colors cursor-pointer"
-                                title="Approve payment & unlock PDF access"
+                                className="px-2.5 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-400/40 rounded-full text-[10px] font-bold hover:bg-amber-500/30 cursor-pointer"
                               >
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                <span>Approve Access</span>
+                                Re-Approve
                               </button>
-                              <button
-                                onClick={() => handleRejectOrder(o.orderId)}
-                                className="px-2.5 py-1 bg-rose-600/80 hover:bg-rose-600 text-white rounded-full text-[11px] font-bold transition-colors cursor-pointer"
-                                title="Reject order"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                                <span>Reject</span>
-                              </button>
-                            </div>
-                          ) : o.paymentStatus === 'verified' ? (
-                            <div className="flex items-center justify-center gap-1 text-emerald-400 font-bold text-[11px]">
-                              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                              <span>Granted</span>
-                            </div>
-                          ) : (
+                            )}
+
+                            {/* Delete Order Button */}
                             <button
-                              onClick={() => handleApproveOrder(o.orderId)}
-                              className="px-2.5 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-400/40 rounded-full text-[10px] font-bold hover:bg-amber-500/30 cursor-pointer"
+                              type="button"
+                              onClick={() => handleDeleteOrder(o.orderId, o.studentName)}
+                              className="p-1.5 text-white/40 hover:text-rose-400 hover:bg-rose-500/20 rounded-lg transition-colors cursor-pointer"
+                              title="Delete Order (মুছে ফেলুন)"
                             >
-                              Re-Approve
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
-                          )}
+                          </div>
                         </td>
                       </tr>
                     ))

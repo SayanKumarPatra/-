@@ -23,13 +23,13 @@ import { Footer } from './components/Footer';
 import { api } from './services/api';
 import { FALLBACK_PRODUCTS } from './constants/fallbackProducts';
 import { subscribeToProductsRealtime } from './firebase/firebase';
-import type { Product } from './types';
+import type { Product, AppView } from './types';
 
 function AppContent() {
   const { student } = useAuth();
 
-  // Navigation View
-  const [currentView, setCurrentView] = useState<'catalog' | 'purchased' | 'admin'>('catalog');
+  // Navigation View - Dedicated Full Page Architecture
+  const [currentView, setCurrentView] = useState<AppView>('catalog');
 
   // Catalog State - Initialized with default 11 BCA 3rd Sem products to eliminate loading spinners or retry errors
   const [products, setProducts] = useState<Product[]>(FALLBACK_PRODUCTS);
@@ -39,7 +39,6 @@ function AppContent() {
 
   // Cart & Selection State
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
   // Purchased IDs set for current logged in student
   const [purchasedProductIds, setPurchasedProductIds] = useState<string[]>([]);
@@ -50,10 +49,7 @@ function AppContent() {
     registeredDevice: any;
     supportInfo: any;
   } | null>(null);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authDefaultRegister, setAuthDefaultRegister] = useState(false);
-  const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
-  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
 
   const loadCatalog = () => {
     setIsLoadingCatalog(true);
@@ -163,30 +159,69 @@ function AppContent() {
         currentView={currentView}
         setCurrentView={setCurrentView}
         selectedCount={selectedProductIds.length}
-        onOpenCart={() => setIsCheckoutOpen(true)}
+        onOpenCart={() => setCurrentView('checkout')}
         onOpenAuth={(isRegister = false) => {
           setAuthDefaultRegister(isRegister);
-          setIsAuthModalOpen(true);
+          setCurrentView('auth');
         }}
-        onOpenAbout={() => setIsAboutModalOpen(true)}
-        onOpenContact={() => setIsContactModalOpen(true)}
+        onOpenAbout={() => setCurrentView('about')}
+        onOpenContact={() => setCurrentView('contact')}
       />
 
-      {/* Main View Switcher */}
+      {/* Main View Switcher - Full Page Rendering */}
       <main className="flex-1">
-        {currentView === 'purchased' ? (
+        {currentView === 'auth' ? (
+          <AuthModal
+            isOpen={true}
+            isPage={true}
+            onClose={() => setCurrentView('catalog')}
+            defaultIsRegister={authDefaultRegister}
+            onSuccess={() => {
+              setCurrentView('purchased');
+            }}
+          />
+        ) : currentView === 'checkout' ? (
+          <CheckoutModal
+            isOpen={true}
+            isPage={true}
+            onClose={() => setCurrentView('catalog')}
+            selectedProducts={selectedProducts}
+            onRemoveProduct={handleRemoveFromCart}
+            onPurchaseSuccess={() => {
+              if (student?.id) {
+                api.getStudentPurchases(student.id).then((data) => {
+                  setPurchasedProductIds(data.purchases.map((p) => p.productId));
+                });
+              }
+              setSelectedProductIds([]);
+              setCurrentView('purchased');
+            }}
+          />
+        ) : currentView === 'about' ? (
+          <AboutModal
+            isOpen={true}
+            isPage={true}
+            onClose={() => setCurrentView('catalog')}
+          />
+        ) : currentView === 'contact' ? (
+          <ContactModal
+            isOpen={true}
+            isPage={true}
+            onClose={() => setCurrentView('catalog')}
+          />
+        ) : currentView === 'purchased' ? (
           <PurchasedContent
             onOpenViewer={(prodId) => setActiveViewerProductId(prodId)}
             onGoToCatalog={() => setCurrentView('catalog')}
             onOpenAuth={() => {
               setAuthDefaultRegister(false);
-              setIsAuthModalOpen(true);
+              setCurrentView('auth');
             }}
           />
         ) : (
           /* Public Storefront Layout Clean & Streamlined */
           <>
-            {/* 2. Sliding Banner Carousel directly beneath the Navbar (No duplicate hero logos) */}
+            {/* 2. Sliding Banner Carousel directly beneath the Navbar */}
             <div className="pt-2 px-2 sm:px-4">
               <HeroBannerSlider
                 onExploreClick={() => {
@@ -216,10 +251,10 @@ function AppContent() {
               onRetry={loadCatalog}
               onToggleSelect={handleToggleSelect}
               onOpenViewer={(prodId) => setActiveViewerProductId(prodId)}
-              onProceedToCheckout={() => setIsCheckoutOpen(true)}
+              onProceedToCheckout={() => setCurrentView('checkout')}
             />
 
-            {/* 5. How It Works: Simple 1, 2, 3, 4 numbered points (no cards, no bloat) */}
+            {/* 5. How It Works: Simple 1, 2, 3, 4 numbered points */}
             <HowItWorks />
           </>
         )}
@@ -227,23 +262,6 @@ function AppContent() {
 
       {/* 6. Compact Footer */}
       <Footer />
-
-      {/* Checkout Modal */}
-      <CheckoutModal
-        isOpen={isCheckoutOpen}
-        onClose={() => setIsCheckoutOpen(false)}
-        selectedProducts={selectedProducts}
-        onRemoveProduct={handleRemoveFromCart}
-        onPurchaseSuccess={() => {
-          if (student?.id) {
-            api.getStudentPurchases(student.id).then((data) => {
-              setPurchasedProductIds(data.purchases.map((p) => p.productId));
-            });
-          }
-          setSelectedProductIds([]);
-          setCurrentView('purchased');
-        }}
-      />
 
       {/* Fast, Clean Online PDF Viewer for Purchased Content */}
       {activeViewerProductId && (
@@ -264,37 +282,15 @@ function AppContent() {
         supportInfo={deviceMismatchData?.supportInfo}
       />
 
-      {/* Student Auth Modal */}
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        defaultIsRegister={authDefaultRegister}
-        onSuccess={() => {
-          setCurrentView('purchased');
-        }}
-      />
-
-      {/* About Modal */}
-      <AboutModal
-        isOpen={isAboutModalOpen}
-        onClose={() => setIsAboutModalOpen(false)}
-      />
-
-      {/* Contact Modal */}
-      <ContactModal
-        isOpen={isContactModalOpen}
-        onClose={() => setIsContactModalOpen(false)}
-      />
-
       {/* 7. Native Mobile App Style Bottom Navigation Bar */}
       <MobileBottomNav
         currentView={currentView}
         setCurrentView={setCurrentView}
         selectedCount={selectedProductIds.length}
-        onOpenCart={() => setIsCheckoutOpen(true)}
+        onOpenCart={() => setCurrentView('checkout')}
         onOpenAuth={() => {
           setAuthDefaultRegister(false);
-          setIsAuthModalOpen(true);
+          setCurrentView('auth');
         }}
       />
     </div>

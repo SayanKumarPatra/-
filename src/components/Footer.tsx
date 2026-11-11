@@ -47,7 +47,7 @@ export const Footer: React.FC = () => {
             </button>
             <div className="flex items-center gap-1.5 text-[#FFE7A3]">
               <ShieldCheck className="w-4 h-4 text-[#FFD34E]" />
-              <span>Razorpay Verified UPI / Gateway</span>
+              <span>Verified Direct UPI &amp; Instant Verification</span>
             </div>
           </div>
         </div>

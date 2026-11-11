@@ -1,10 +1,11 @@
 import React from 'react';
 import { Home, BookOpenCheck, MessageCircle, ShoppingBag, GraduationCap } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import type { AppView } from '../types';
 
 interface MobileBottomNavProps {
-  currentView: 'catalog' | 'purchased' | 'admin';
-  setCurrentView: (view: 'catalog' | 'purchased' | 'admin') => void;
+  currentView: AppView;
+  setCurrentView: (view: AppView) => void;
   selectedCount: number;
   onOpenCart: () => void;
   onOpenAuth: () => void;

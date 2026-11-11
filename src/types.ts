@@ -124,3 +124,5 @@ export interface AdminAuditLog {
   timestamp: string;
   ipAddress?: string;
 }
+
+export type AppView = 'catalog' | 'purchased' | 'admin' | 'auth' | 'checkout' | 'about' | 'contact';

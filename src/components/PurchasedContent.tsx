@@ -76,10 +76,10 @@ export const PurchasedContent: React.FC<PurchasedContentProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-white/15">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-            My Purchased Question Banks
+            My Notes
           </h1>
           <p className="text-xs text-[#FFE7A3] mt-1">
-            Verified licensed question banks for <span className="font-bold text-white">{student.fullName}</span> ({student.email})
+            আপনার অর্ডারের তালিকা ও অনুমোদিত স্টাডি নোটস — <span className="font-bold text-white">{student.fullName}</span> ({student.email})
           </p>
         </div>
 
@@ -173,20 +173,22 @@ export const PurchasedContent: React.FC<PurchasedContentProps> = ({
                     {item.accessStatus === 'active' ? (
                       <span className="inline-flex items-center gap-1 text-emerald-400 font-semibold">
                         <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                        Active &amp; Protected
+                        অ্যাক্সেস সক্রিয় (Access Active)
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-amber-300 font-semibold bg-amber-500/20 px-2 py-0.5 rounded-md border border-amber-400/40">
                         <Clock className="w-3 h-3 text-amber-300 animate-pulse" />
-                        ভেরিফিকেশন চলছে (Pending Admin Approval)
+                        ভেরিফিকেশন চলছে (Verification in Progress)
                       </span>
                     )}
                   </div>
 
                   {item.accessStatus !== 'active' && (
-                    <p className="mt-2 text-[11px] text-[#FFE7A3] bg-black/40 px-3 py-1.5 rounded-xl border border-white/10 max-w-lg">
-                      ⚠️ আপনার পেমেন্ট ভেরিফিকেশন চলছে। অ্যাডমিন অ্যাক্সেস দিলেই এই প্রশ্নপত্রটি ওপেন করতে পারবেন (১০-২০ মিনিট সময় লাগে)।
-                    </p>
+                    <div className="mt-2.5 p-3 rounded-xl bg-amber-950/40 border border-amber-500/30 max-w-xl">
+                      <p className="text-xs text-[#FFE7A3] font-medium leading-relaxed">
+                        ⏳ <strong>আপনার পেমেন্ট ভেরিফিকেশন চলছে:</strong> অ্যাডমিন পেমেন্ট চেক করে কিছুক্ষণের মধ্যে অ্যাক্সেস দিয়ে দেবেন। অনুমোদিত হওয়া মাত্রই আপনি এই সম্পূর্ণ পিডিএফ নোটস পড়তে পারবেন।
+                      </p>
+                    </div>
                   )}
                 </div>
 
@@ -197,16 +199,17 @@ export const PurchasedContent: React.FC<PurchasedContentProps> = ({
                       className="btn-gold-primary w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 text-xs font-extrabold rounded-full cursor-pointer whitespace-nowrap shadow-[0_4px_15px_rgba(255,211,78,0.35)]"
                     >
                       <BookOpen className="w-4 h-4" />
-                      <span>Open Question Bank</span>
+                      <span>এখনই পড়ুন (Read Note)</span>
                     </button>
                   ) : (
                     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                       <button
                         disabled
-                        className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-5 py-2.5 text-xs font-bold rounded-full bg-white/10 text-white/50 border border-white/20 cursor-not-allowed"
+                        className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-5 py-2.5 text-xs font-bold rounded-full bg-amber-500/15 text-amber-200 border border-amber-400/30 cursor-not-allowed"
+                        title="অ্যাডমিন অনুমোদন দিলে পড়তে পারবেন"
                       >
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>Awaiting Approval (অপেক্ষা করুন)</span>
+                        <Clock className="w-3.5 h-3.5 animate-pulse text-amber-300" />
+                        <span>ভেরিফিকেশন চলছে (অপেক্ষা করুন)</span>
                       </button>
                       <a
                         href={`https://wa.me/91${BRAND.payment?.whatsappPhone || '9382040746'}?text=${encodeURIComponent(

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Lock, Mail, Phone, User } from 'lucide-react';
+import { X, Lock, Mail, Phone, User, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { BRAND } from '../constants/brand';
 
@@ -12,6 +12,7 @@ interface AuthModalProps {
   onClose: () => void;
   defaultIsRegister?: boolean;
   onSuccess?: () => void;
+  isPage?: boolean;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
@@ -19,6 +20,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onClose,
   defaultIsRegister = false,
   onSuccess,
+  isPage = false,
 }) => {
   const { loginStudent } = useAuth();
   const [isRegister, setIsRegister] = useState(defaultIsRegister);
@@ -140,17 +142,36 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
-      <div className="liquid-glass-master rounded-3xl max-w-sm w-full p-6 sm:p-7 border border-[#FFE7A3]/30 shadow-[0_25px_60px_rgba(0,0,0,0.85)] relative">
+    <div
+      className={
+        isPage
+          ? 'min-h-[85vh] flex flex-col items-center justify-center p-4 py-8'
+          : 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md overflow-y-auto'
+      }
+    >
+      {isPage && (
+        <div className="w-full max-w-sm mb-4">
+          <button
+            onClick={onClose}
+            className="inline-flex items-center gap-1.5 text-xs text-[#FFE7A3] hover:text-white px-3.5 py-1.5 rounded-full bg-black/40 border border-[#FFE7A3]/30 transition-all cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Return to Public Website</span>
+          </button>
+        </div>
+      )}
+      <div className="liquid-glass-master rounded-3xl max-w-sm w-full p-6 sm:p-7 border border-[#FFE7A3]/30 shadow-[0_25px_60px_rgba(0,0,0,0.85)] relative my-auto">
         {/* Top Rim Specular Line */}
         <div className="absolute inset-x-8 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#FFD34E]/60 to-transparent pointer-events-none" />
 
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 text-white/60 hover:text-white rounded-lg hover:bg-white/10 cursor-pointer"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        {!isPage && (
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-1.5 text-white/60 hover:text-white rounded-lg hover:bg-white/10 cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
 
         {/* Brand Logo & Title */}
         <div className="text-center mb-6">
@@ -235,8 +256,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         <form onSubmit={handleSubmit} className="space-y-3.5">
           {error && (
-            <div className="p-2.5 bg-rose-950/80 border border-rose-500/50 rounded-xl text-xs text-rose-200">
-              {error}
+            <div className="p-3 bg-rose-950/80 border border-rose-500/50 rounded-xl text-xs text-rose-200 text-left">
+              <p>{error}</p>
+              {!isRegister && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRegister(true);
+                    setError('');
+                    const clean = email.trim();
+                    if (/^\d{10}$/.test(clean)) {
+                      setMobile(clean);
+                      setEmail('');
+                    }
+                  }}
+                  className="mt-2 text-xs font-bold text-[#FFD34E] hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <span>👉 এখানে ক্লিক করে ১ মিনিটে অ্যাকাউন্ট রেজিস্টার করুন</span>
+                </button>
+              )}
             </div>
           )}
 

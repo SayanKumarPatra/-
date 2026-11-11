@@ -11,6 +11,7 @@ import type {
   ViewerSession,
   AdminAuditLog,
 } from '../src/types';
+import { firebaseSync } from './firebaseSync';
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'bca_database.json');
@@ -539,6 +540,7 @@ class Database {
     };
     this.data.students.push(student);
     this.persist();
+    firebaseSync.syncStudent(student).catch(() => {});
     return student;
   }
 
@@ -560,6 +562,7 @@ class Database {
   createOrder(order: Order): Order {
     this.data.orders.push(order);
     this.persist();
+    firebaseSync.syncOrder(order).catch(() => {});
     return order;
   }
 
@@ -571,6 +574,7 @@ class Database {
       ...updates,
     };
     this.persist();
+    firebaseSync.syncOrder(this.data.orders[idx]).catch(() => {});
     return this.data.orders[idx];
   }
 
@@ -610,6 +614,7 @@ class Database {
     });
 
     this.persist();
+    firebaseSync.syncOrder(order).catch(() => {});
     return { success: true, order };
   }
 
@@ -637,7 +642,31 @@ class Database {
     });
 
     this.persist();
+    firebaseSync.syncOrder(order).catch(() => {});
     return { success: true, order };
+  }
+
+  deleteOrder(orderId: string, adminId: string = 'admin'): { success: boolean; error?: string } {
+    const idx = this.data.orders.findIndex((o) => o.orderId === orderId);
+    if (idx === -1) return { success: false, error: 'Order not found' };
+
+    const order = this.data.orders[idx];
+    this.data.orders.splice(idx, 1);
+
+    // Remove any purchases directly tied to this order
+    this.data.purchases = this.data.purchases.filter((p) => p.orderId !== orderId);
+
+    this.logAdminAction({
+      adminId,
+      action: 'DELETE_ORDER',
+      targetId: orderId,
+      targetType: 'ORDER',
+      details: `Deleted order ${orderId} (${order.studentName}, ₹${order.totalAmount}) and associated access records.`,
+    });
+
+    this.persist();
+    firebaseSync.deleteOrder(orderId).catch(() => {});
+    return { success: true };
   }
 
   // --- PURCHASES ---

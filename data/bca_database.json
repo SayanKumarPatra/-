@@ -115,7 +115,7 @@
     {
       "id": "prod-bca-aec3-bengali",
       "semesterId": "sem-3",
-      "subjectCode": "AEC-3",
+      "subjectCode": "AEC-3 (BEN)",
       "subjectName": "BENGALI AEC-3",
       "description": "University syllabus-aligned question bank for Bengali AEC-3. Selected essays, modern prose, grammar, composition, and previous year university paper solutions.",
       "syllabusHighlights": [
@@ -140,7 +140,7 @@
     {
       "id": "prod-bca-aec3-sanskrit",
       "semesterId": "sem-3",
-      "subjectCode": "AEC-3",
+      "subjectCode": "AEC-3 (SAN)",
       "subjectName": "SANSKRIT AEC-3",
       "description": "Curated question bank for Sanskrit AEC-3. Shlokas, translations, classical grammar rules, sandhi, samasa, and probable semester questions.",
       "syllabusHighlights": [
@@ -297,6 +297,15 @@
       "registeredAt": "2026-11-11T06:07:06.218Z",
       "lastLoginAt": "2026-11-11T06:07:16.055Z",
       "lastIp": "127.0.0.1"
+    },
+    {
+      "id": "std-1794384760076-bh97l",
+      "email": "livebca@gmail.com",
+      "fullName": "BCA Live Test Student",
+      "mobile": "9876501234",
+      "registeredAt": "2026-11-11T08:12:40.076Z",
+      "lastLoginAt": "2026-11-11T08:12:40.076Z",
+      "lastIp": "127.0.0.1"
     }
   ],
   "orders": [
@@ -324,6 +333,37 @@
       "ipAddress": "127.0.0.1",
       "paymentReference": "upi_431209845612",
       "verifiedAt": "2026-11-11T06:07:48.010Z"
+    },
+    {
+      "orderId": "ORD-202611-A769BC",
+      "userId": "std-1794384760076-bh97l",
+      "studentName": "BCA Live Test Student",
+      "studentEmail": "livebca@gmail.com",
+      "studentMobile": "9876501234",
+      "selectedProductIds": [
+        "prod-bca-maj3",
+        "prod-bca-aec3-bengali"
+      ],
+      "items": [
+        {
+          "productId": "prod-bca-maj3",
+          "subjectName": "COMPUTER ARCHITECTURE MAJ-3",
+          "subjectCode": "MAJ-3",
+          "price": 99
+        },
+        {
+          "productId": "prod-bca-aec3-bengali",
+          "subjectName": "BENGALI AEC-3",
+          "subjectCode": "AEC-3 (BEN)",
+          "price": 79
+        }
+      ],
+      "totalAmount": 178,
+      "paymentGatewayOrderId": "rzp_test_ord_1794384760078_416dce15",
+      "paymentStatus": "verified",
+      "createdAt": "2026-11-11T08:12:40.078Z",
+      "ipAddress": "127.0.0.1",
+      "verifiedAt": "2026-11-11T08:13:10.278Z"
     }
   ],
   "purchases": [
@@ -334,6 +374,22 @@
       "orderId": "ORD-202611-63B905",
       "accessStatus": "active",
       "createdAt": "2026-11-11T06:07:22.730Z"
+    },
+    {
+      "purchaseId": "pur-1794384790278-r5rt",
+      "userId": "std-1794384760076-bh97l",
+      "productId": "prod-bca-maj3",
+      "orderId": "ORD-202611-A769BC",
+      "accessStatus": "active",
+      "createdAt": "2026-11-11T08:13:10.278Z"
+    },
+    {
+      "purchaseId": "pur-1794384790278-y4yz",
+      "userId": "std-1794384760076-bh97l",
+      "productId": "prod-bca-aec3-bengali",
+      "orderId": "ORD-202611-A769BC",
+      "accessStatus": "active",
+      "createdAt": "2026-11-11T08:13:10.278Z"
     }
   ],
   "devices": [
@@ -368,6 +424,15 @@
     }
   ],
   "adminAuditLogs": [
+    {
+      "adminId": "admin",
+      "action": "APPROVE_ORDER",
+      "targetId": "ORD-202611-A769BC",
+      "targetType": "ORDER",
+      "details": "Approved payment for order ORD-202611-A769BC (BCA Live Test Student, ₹178). Full PDF access granted for 2 subjects.",
+      "id": "log-1794384790278-iij5",
+      "timestamp": "2026-11-11T08:13:10.278Z"
+    },
     {
       "adminId": "admin_session",
       "action": "ADMIN_LOGIN",

@@ -6,6 +6,7 @@
 export const firebaseConfig = {
   apiKey: "AIzaSyDHOCOmhLXjQoJKjJ0JZfwXNufM68n6m5U",
   authDomain: "bcastudypoint-cdfdf.firebaseapp.com",
+  databaseURL: "https://bcastudypoint-cdfdf-default-rtdb.firebaseio.com",
   projectId: "bcastudypoint-cdfdf",
   storageBucket: "bcastudypoint-cdfdf.firebasestorage.app",
   messagingSenderId: "580615617868",

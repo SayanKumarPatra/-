@@ -1,24 +1,44 @@
 import React from 'react';
-import { X, Phone, MessageSquare, Clock, ShieldCheck } from 'lucide-react';
+import { X, Phone, MessageSquare, Clock, ShieldCheck, ArrowLeft } from 'lucide-react';
 import { BRAND } from '../constants/brand';
 
 interface ContactModalProps {
   isOpen: boolean;
   onClose: () => void;
+  isPage?: boolean;
 }
 
-export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
+export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose, isPage = false }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md">
-      <div className="liquid-glass-master rounded-3xl max-w-md w-full p-5 sm:p-7 border border-[#FFE7A3]/30 shadow-2xl relative text-left">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 text-white/60 hover:text-white rounded-lg hover:bg-white/10 cursor-pointer"
-        >
-          <X className="w-5 h-5" />
-        </button>
+    <div
+      className={
+        isPage
+          ? 'min-h-[85vh] flex flex-col items-center justify-center p-3 sm:p-4 py-8'
+          : 'fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md'
+      }
+    >
+      {isPage && (
+        <div className="w-full max-w-md mb-3">
+          <button
+            onClick={onClose}
+            className="inline-flex items-center gap-1.5 text-xs text-[#FFE7A3] hover:text-white px-3.5 py-1.5 rounded-full bg-black/40 border border-[#FFE7A3]/30 transition-all cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Return to Public Website</span>
+          </button>
+        </div>
+      )}
+      <div className="liquid-glass-master rounded-3xl max-w-md w-full p-5 sm:p-7 border border-[#FFE7A3]/30 shadow-2xl relative text-left my-auto">
+        {!isPage && (
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-1.5 text-white/60 hover:text-white rounded-lg hover:bg-white/10 cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
 
         <div className="flex items-center gap-3 mb-4">
           <img

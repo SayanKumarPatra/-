@@ -9,6 +9,7 @@ import {
   Phone,
   QrCode,
   ArrowRight,
+  ArrowLeft,
   ShieldCheck,
   Smartphone,
   ExternalLink,
@@ -16,6 +17,7 @@ import {
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { BRAND } from '../constants/brand';
+import { saveOrderRealtime } from '../firebase/firebase';
 import type { Product } from '../types';
 
 interface CheckoutModalProps {
@@ -24,6 +26,7 @@ interface CheckoutModalProps {
   selectedProducts: Product[];
   onRemoveProduct: (productId: string) => void;
   onPurchaseSuccess: (orderId: string) => void;
+  isPage?: boolean;
 }
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({
@@ -32,6 +35,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   selectedProducts,
   onRemoveProduct,
   onPurchaseSuccess,
+  isPage = false,
 }) => {
   const { student, loginStudent } = useAuth();
 
@@ -127,6 +131,20 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         isTestSimulation: true,
       });
 
+      // Sync order in real-time to Firebase Realtime Database & Firestore
+      saveOrderRealtime({
+        orderId: orderRes.order.orderId,
+        userId: orderRes.order.student.id,
+        studentName: orderRes.order.student.fullName,
+        studentEmail: orderRes.order.student.email,
+        studentMobile: orderRes.order.student.mobile,
+        selectedProductIds: selectedProducts.map((p) => p.id),
+        totalAmount: totalPayable,
+        paymentStatus: 'pending',
+        paymentReference: `upi_${utrNumber.trim()}`,
+        createdAt: new Date().toISOString(),
+      }).catch(() => {});
+
       // Login student session
       loginStudent({
         id: orderRes.order.student.id,
@@ -169,15 +187,34 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   )}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
+    <div
+      className={
+        isPage
+          ? 'min-h-[85vh] flex flex-col items-center justify-center p-3 sm:p-6 py-8'
+          : 'fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto'
+      }
+    >
+      {isPage && (
+        <div className="w-full max-w-lg mb-3">
+          <button
+            onClick={onClose}
+            className="inline-flex items-center gap-1.5 text-xs text-[#FFE7A3] hover:text-white px-3.5 py-1.5 rounded-full bg-black/40 border border-[#FFE7A3]/30 transition-all cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Return to Public Website</span>
+          </button>
+        </div>
+      )}
       <div className="liquid-glass-master rounded-2xl sm:rounded-3xl max-w-lg w-full max-h-[92vh] overflow-y-auto p-4 sm:p-6 border border-[#FFE7A3]/30 shadow-2xl relative text-left my-auto">
         {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-3.5 right-3.5 p-1 text-white/60 hover:text-white rounded-lg hover:bg-white/10 cursor-pointer"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        {!isPage && (
+          <button
+            onClick={onClose}
+            className="absolute top-3.5 right-3.5 p-1 text-white/60 hover:text-white rounded-lg hover:bg-white/10 cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
 
         {/* Modal Header */}
         <div className="flex items-center gap-2.5 mb-3 pb-3 border-b border-white/15">

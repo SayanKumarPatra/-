@@ -105,7 +105,7 @@ export const FALLBACK_PRODUCTS: Product[] = [
   {
     id: 'prod-bca-aec3-bengali',
     semesterId: 'sem-3',
-    subjectCode: 'AEC-3',
+    subjectCode: 'AEC-3 (BEN)',
     subjectName: 'BENGALI AEC-3',
     description: 'University syllabus-aligned question bank for Bengali AEC-3. Selected essays, modern prose, grammar, composition, and previous year university paper solutions.',
     syllabusHighlights: [
@@ -130,7 +130,7 @@ export const FALLBACK_PRODUCTS: Product[] = [
   {
     id: 'prod-bca-aec3-sanskrit',
     semesterId: 'sem-3',
-    subjectCode: 'AEC-3',
+    subjectCode: 'AEC-3 (SAN)',
     subjectName: 'SANSKRIT AEC-3',
     description: 'Curated question bank for Sanskrit AEC-3. Shlokas, translations, classical grammar rules, sandhi, samasa, and probable semester questions.',
     syllabusHighlights: [
