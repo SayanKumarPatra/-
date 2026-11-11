@@ -555,8 +555,43 @@ class Database {
     return this.data.orders.find((o) => o.orderId === orderId);
   }
 
-  getStudentOrders(userId: string): Order[] {
-    return this.data.orders.filter((o) => o.userId === userId);
+  getStudentOrders(identifier: string): Order[] {
+    if (!identifier) return [];
+    const clean = identifier.trim().toLowerCase();
+    const cleanMobile = identifier.replace(/\D/g, '');
+
+    // Find student in DB by ID, email, or mobile
+    const student = this.data.students.find(
+      (s) =>
+        s.id === identifier ||
+        s.email.toLowerCase() === clean ||
+        (cleanMobile.length >= 10 && s.mobile.replace(/\D/g, '') === cleanMobile)
+    );
+
+    const matchEmails = new Set<string>();
+    const matchMobiles = new Set<string>();
+    const matchUserIds = new Set<string>([identifier]);
+
+    if (student) {
+      matchUserIds.add(student.id);
+      if (student.email) matchEmails.add(student.email.toLowerCase());
+      if (student.mobile) matchMobiles.add(student.mobile.replace(/\D/g, ''));
+    }
+    if (clean.includes('@')) {
+      matchEmails.add(clean);
+    }
+    if (cleanMobile.length >= 10) {
+      matchMobiles.add(cleanMobile);
+    }
+
+    return this.data.orders
+      .filter((o) => {
+        if (matchUserIds.has(o.userId)) return true;
+        if (o.studentEmail && matchEmails.has(o.studentEmail.toLowerCase())) return true;
+        if (o.studentMobile && matchMobiles.has(o.studentMobile.replace(/\D/g, ''))) return true;
+        return false;
+      })
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   createOrder(order: Order): Order {
@@ -674,22 +709,29 @@ class Database {
     return this.data.purchases;
   }
 
-  getStudentPurchases(userId: string): Purchase[] {
+  getStudentPurchases(identifier: string): Purchase[] {
+    const studentOrders = this.getStudentOrders(identifier);
+    const orderIds = new Set(studentOrders.map((o) => o.orderId));
+    const userIds = new Set(studentOrders.map((o) => o.userId));
+    if (identifier) userIds.add(identifier);
+
     return this.data.purchases.filter(
-      (p) => p.userId === userId && (p.accessStatus === 'active' || p.accessStatus === 'pending_approval')
+      (p) =>
+        (userIds.has(p.userId) || (p.orderId && orderIds.has(p.orderId))) &&
+        (p.accessStatus === 'active' || p.accessStatus === 'pending_approval')
     );
   }
 
   hasPurchased(userId: string, productId: string): boolean {
-    return this.data.purchases.some(
-      (p) => p.userId === userId && p.productId === productId && p.accessStatus === 'active'
+    const purchases = this.getStudentPurchases(userId);
+    return purchases.some(
+      (p) => p.productId === productId && p.accessStatus === 'active'
     );
   }
 
   getPurchaseStatus(userId: string, productId: string): 'active' | 'pending_approval' | 'revoked' | 'unpurchased' {
-    const p = this.data.purchases.find(
-      (pur) => pur.userId === userId && pur.productId === productId
-    );
+    const purchases = this.getStudentPurchases(userId);
+    const p = purchases.find((pur) => pur.productId === productId);
     if (!p) return 'unpurchased';
     return p.accessStatus;
   }

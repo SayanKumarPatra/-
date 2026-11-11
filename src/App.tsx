@@ -187,11 +187,15 @@ function AppContent() {
             onClose={() => setCurrentView('catalog')}
             selectedProducts={selectedProducts}
             onRemoveProduct={handleRemoveFromCart}
-            onPurchaseSuccess={() => {
-              if (student?.id) {
-                api.getStudentPurchases(student.id).then((data) => {
-                  setPurchasedProductIds(data.purchases.map((p) => p.productId));
-                });
+            onPurchaseSuccess={(orderId) => {
+              const activeStudent = student || JSON.parse(localStorage.getItem('bca_logged_in_student') || 'null');
+              if (activeStudent?.id || activeStudent?.email || activeStudent?.mobile) {
+                const queryId = activeStudent.id || activeStudent.email || activeStudent.mobile;
+                api.getStudentPurchases(queryId).then((data) => {
+                  setPurchasedProductIds(
+                    data.purchases.filter((p: any) => p.accessStatus === 'active').map((p: any) => p.productId)
+                  );
+                }).catch(() => {});
               }
               setSelectedProductIds([]);
               setCurrentView('purchased');

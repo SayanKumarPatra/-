@@ -123,17 +123,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         selectedProductIds: selectedProducts.map((p) => p.id),
       });
 
+      const confirmedOrderId = orderRes.order.orderId;
+      setGeneratedOrderId(confirmedOrderId);
+      localStorage.setItem('bca_last_order_id', confirmedOrderId);
+
       // Verify payment with student UTR ref
       await api.verifyPayment({
-        orderId: orderRes.order.orderId,
+        orderId: confirmedOrderId,
+        utrNumber: utrNumber.trim(),
         razorpayOrderId: orderRes.order.paymentGatewayOrderId,
-        razorpayPaymentId: `upi_${utrNumber.trim()}`,
+        razorpayPaymentId: utrNumber.trim(),
         isTestSimulation: true,
       });
 
-      // Sync order in real-time to Firebase Realtime Database & Firestore
+      // Sync order in real-time to Firebase Realtime Database
       saveOrderRealtime({
-        orderId: orderRes.order.orderId,
+        orderId: confirmedOrderId,
         userId: orderRes.order.student.id,
         studentName: orderRes.order.student.fullName,
         studentEmail: orderRes.order.student.email,
@@ -141,11 +146,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         selectedProductIds: selectedProducts.map((p) => p.id),
         totalAmount: totalPayable,
         paymentStatus: 'pending',
-        paymentReference: `upi_${utrNumber.trim()}`,
+        paymentReference: utrNumber.trim(),
         createdAt: new Date().toISOString(),
       }).catch(() => {});
 
-      // Login student session
+      // Login student session so My Notes displays immediately
       loginStudent({
         id: orderRes.order.student.id,
         fullName: orderRes.order.student.fullName,
@@ -154,9 +159,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       });
 
       setStep('confirmed');
-      onPurchaseSuccess(orderRes.order.orderId);
     } catch (err: any) {
-      // Even if offline, save locally
+      console.warn('Checkout submission notice:', err);
+      const fallbackOrderId = generatedOrderId || `ORD-${Date.now().toString().slice(-6)}`;
+      setGeneratedOrderId(fallbackOrderId);
       loginStudent({
         id: `std_${Date.now()}`,
         fullName: fullName.trim(),
@@ -164,7 +170,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         mobile,
       });
       setStep('confirmed');
-      onPurchaseSuccess(generatedOrderId || 'BCA-OFFLINE');
     } finally {
       setIsSubmitting(false);
     }
@@ -492,12 +497,30 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <span>Send Receipt on WhatsApp ({WHATSAPP_PHONE})</span>
             </a>
 
+            <div className="p-3 bg-black/40 rounded-xl border border-white/15 text-left text-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-white/70">Order ID:</span>
+                <span className="font-mono font-black text-[#FFD34E] text-sm">{generatedOrderId}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-white/70">Total Amount:</span>
+                <span className="font-black text-white">₹{totalPayable}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-white/70">Status:</span>
+                <span className="text-amber-300 font-bold">ভেরিফিকেশন চলছে (Pending)</span>
+              </div>
+            </div>
+
             <div className="pt-2">
               <button
-                onClick={onClose}
-                className="btn-gold-primary px-8 py-2 text-xs font-bold rounded-full cursor-pointer"
+                type="button"
+                onClick={() => {
+                  onPurchaseSuccess(generatedOrderId);
+                }}
+                className="btn-gold-primary w-full py-3 px-6 text-xs font-black rounded-full cursor-pointer shadow-lg hover:scale-102 transition-transform"
               >
-                Go to My Purchased Notes
+                Go to My Notes (আমার নোটস দেখতে যান) →
               </button>
             </div>
           </div>

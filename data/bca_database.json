@@ -292,10 +292,10 @@
     {
       "id": "std-1794377226218-rb16k",
       "email": "sourav@gmail.com",
-      "fullName": "Sourav Das",
+      "fullName": "Rahul Sen",
       "mobile": "9876543210",
       "registeredAt": "2026-11-11T06:07:06.218Z",
-      "lastLoginAt": "2026-11-11T06:07:16.055Z",
+      "lastLoginAt": "2026-11-11T09:50:41.975Z",
       "lastIp": "127.0.0.1"
     },
     {
@@ -306,13 +306,54 @@
       "registeredAt": "2026-11-11T08:12:40.076Z",
       "lastLoginAt": "2026-11-11T08:12:40.076Z",
       "lastIp": "127.0.0.1"
+    },
+    {
+      "id": "std-1794391129305-ies3l",
+      "email": "ananya@student.com",
+      "fullName": "Ananya Mukherjee",
+      "mobile": "9830112233",
+      "registeredAt": "2026-11-11T09:58:49.305Z",
+      "lastLoginAt": "2026-11-11T09:58:49.305Z",
+      "lastIp": "127.0.0.1"
     }
   ],
   "orders": [
     {
-      "orderId": "ORD-202611-63B905",
+      "orderId": "ORD-202611-297909",
+      "userId": "std-1794391129305-ies3l",
+      "studentName": "Ananya Mukherjee",
+      "studentEmail": "ananya@student.com",
+      "studentMobile": "9830112233",
+      "selectedProductIds": [
+        "prod-bca-maj3",
+        "prod-bca-min3"
+      ],
+      "items": [
+        {
+          "productId": "prod-bca-maj3",
+          "subjectName": "COMPUTER ARCHITECTURE MAJ-3",
+          "subjectCode": "MAJ-3",
+          "price": 99
+        },
+        {
+          "productId": "prod-bca-min3",
+          "subjectName": "BUSINESS ENVIRONMENT MIN-3",
+          "subjectCode": "MIN-3",
+          "price": 99
+        }
+      ],
+      "totalAmount": 198,
+      "paymentGatewayOrderId": "upi_ORD-202611-297909_1794391129307",
+      "paymentStatus": "verified",
+      "createdAt": "2026-11-11T09:58:49.307Z",
+      "ipAddress": "127.0.0.1",
+      "paymentReference": "998877665544",
+      "verifiedAt": "2026-11-11T09:58:49.346Z"
+    },
+    {
+      "orderId": "ORD-202611-5E67A5",
       "userId": "std-1794377226218-rb16k",
-      "studentName": "Sourav Das",
+      "studentName": "Rahul Sen",
       "studentEmail": "sourav@gmail.com",
       "studentMobile": "9876543210",
       "selectedProductIds": [
@@ -327,12 +368,11 @@
         }
       ],
       "totalAmount": 99,
-      "paymentGatewayOrderId": "rzp_test_ord_1794377236056_3beb5b3a",
-      "paymentStatus": "verified",
-      "createdAt": "2026-11-11T06:07:16.056Z",
+      "paymentGatewayOrderId": "upi_ORD-202611-5E67A5_1794390641976",
+      "paymentStatus": "pending",
+      "createdAt": "2026-11-11T09:50:41.976Z",
       "ipAddress": "127.0.0.1",
-      "paymentReference": "upi_431209845612",
-      "verifiedAt": "2026-11-11T06:07:48.010Z"
+      "paymentReference": "123456789012"
     },
     {
       "orderId": "ORD-202611-A769BC",
@@ -364,6 +404,31 @@
       "createdAt": "2026-11-11T08:12:40.078Z",
       "ipAddress": "127.0.0.1",
       "verifiedAt": "2026-11-11T08:13:10.278Z"
+    },
+    {
+      "orderId": "ORD-202611-63B905",
+      "userId": "std-1794377226218-rb16k",
+      "studentName": "Sourav Das",
+      "studentEmail": "sourav@gmail.com",
+      "studentMobile": "9876543210",
+      "selectedProductIds": [
+        "prod-bca-maj3"
+      ],
+      "items": [
+        {
+          "productId": "prod-bca-maj3",
+          "subjectName": "COMPUTER ARCHITECTURE MAJ-3",
+          "subjectCode": "MAJ-3",
+          "price": 99
+        }
+      ],
+      "totalAmount": 99,
+      "paymentGatewayOrderId": "rzp_test_ord_1794377236056_3beb5b3a",
+      "paymentStatus": "verified",
+      "createdAt": "2026-11-11T06:07:16.056Z",
+      "ipAddress": "127.0.0.1",
+      "paymentReference": "upi_431209845612",
+      "verifiedAt": "2026-11-11T06:07:48.010Z"
     }
   ],
   "purchases": [
@@ -371,8 +436,8 @@
       "purchaseId": "pur-1794377242730-apg9",
       "userId": "std-1794377226218-rb16k",
       "productId": "prod-bca-maj3",
-      "orderId": "ORD-202611-63B905",
-      "accessStatus": "active",
+      "orderId": "ORD-202611-5E67A5",
+      "accessStatus": "pending_approval",
       "createdAt": "2026-11-11T06:07:22.730Z"
     },
     {
@@ -390,6 +455,22 @@
       "orderId": "ORD-202611-A769BC",
       "accessStatus": "active",
       "createdAt": "2026-11-11T08:13:10.278Z"
+    },
+    {
+      "purchaseId": "pur-1794391129328-heem",
+      "userId": "std-1794391129305-ies3l",
+      "productId": "prod-bca-maj3",
+      "orderId": "ORD-202611-297909",
+      "accessStatus": "active",
+      "createdAt": "2026-11-11T09:58:49.328Z"
+    },
+    {
+      "purchaseId": "pur-1794391129328-9lpu",
+      "userId": "std-1794391129305-ies3l",
+      "productId": "prod-bca-min3",
+      "orderId": "ORD-202611-297909",
+      "accessStatus": "active",
+      "createdAt": "2026-11-11T09:58:49.328Z"
     }
   ],
   "devices": [
@@ -424,6 +505,33 @@
     }
   ],
   "adminAuditLogs": [
+    {
+      "adminId": "admin",
+      "action": "APPROVE_ORDER",
+      "targetId": "ORD-202611-297909",
+      "targetType": "ORDER",
+      "details": "Approved payment for order ORD-202611-297909 (Ananya Mukherjee, ₹198). Full PDF access granted for 2 subjects.",
+      "id": "log-1794391129346-rdgq",
+      "timestamp": "2026-11-11T09:58:49.346Z"
+    },
+    {
+      "adminId": "payment-submission",
+      "action": "PAYMENT_SUBMITTED_FOR_VERIFICATION",
+      "targetId": "ORD-202611-297909",
+      "targetType": "ORDER",
+      "details": "Payment submitted ₹198 by Ananya Mukherjee (ananya@student.com). Reference: 998877665544. Awaiting Admin verification before unlocking access.",
+      "id": "log-1794391129329-25vv",
+      "timestamp": "2026-11-11T09:58:49.329Z"
+    },
+    {
+      "adminId": "payment-submission",
+      "action": "PAYMENT_SUBMITTED_FOR_VERIFICATION",
+      "targetId": "ORD-202611-5E67A5",
+      "targetType": "ORDER",
+      "details": "Payment submitted ₹99 by Rahul Sen (sourav@gmail.com). Reference: 123456789012. Awaiting Admin verification before unlocking access.",
+      "id": "log-1794390646961-xg56",
+      "timestamp": "2026-11-11T09:50:46.961Z"
+    },
     {
       "adminId": "admin",
       "action": "APPROVE_ORDER",

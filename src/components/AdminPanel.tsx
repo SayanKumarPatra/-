@@ -20,6 +20,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Clock,
 } from 'lucide-react';
 import { api, getStoredAdminKey, setStoredAdminKey } from '../services/api';
 import { BRAND } from '../constants/brand';
@@ -65,8 +66,9 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   const [selectedDeviceUser, setSelectedDeviceUser] = useState<DeviceBinding | null>(null);
   const [resetReason, setResetReason] = useState('Student verified device replacement request');
 
-  // Search filter
+  // Search and order filter
   const [searchFilter, setSearchFilter] = useState('');
+  const [orderStatusFilter, setOrderStatusFilter] = useState<'all' | 'pending' | 'verified'>('all');
 
   // Real-time Product Edit Modal State
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -241,6 +243,21 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   useEffect(() => {
     if (isAuthenticated) {
       loadAllAdminData();
+
+      // Auto-poll orders and stats every 6 seconds so incoming orders appear instantly
+      const autoRefreshTimer = setInterval(() => {
+        Promise.all([
+          api.getAdminStats(),
+          api.getAdminOrders(),
+        ])
+          .then(([statsData, ordData]) => {
+            if (statsData?.stats) setStats(statsData.stats);
+            if (ordData?.orders) setOrders(ordData.orders);
+          })
+          .catch(() => {});
+      }, 6000);
+
+      return () => clearInterval(autoRefreshTimer);
     }
   }, [isAuthenticated]);
 
@@ -528,6 +545,7 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
             ].map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
+              const pendingCount = orders.filter((o) => o.paymentStatus === 'pending').length;
               return (
                 <button
                   key={tab.id}
@@ -540,6 +558,11 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
                 >
                   <Icon className="w-4 h-4" />
                   <span>{tab.label}</span>
+                  {tab.id === 'orders' && pendingCount > 0 && (
+                    <span className="ml-1 px-2 py-0.5 rounded-full bg-amber-400 text-black font-black text-[10px] animate-pulse shadow-sm">
+                      {pendingCount} New
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -558,6 +581,93 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
         {/* Tab 1: Dashboard Overview */}
         {activeTab === 'dashboard' && stats && (
           <div className="space-y-6">
+            {/* URGENT PENDING ORDERS BANNER */}
+            {orders.some((o) => o.paymentStatus === 'pending') && (
+              <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-amber-950/90 to-amber-900/80 border-2 border-amber-400 shadow-[0_0_35px_rgba(251,191,36,0.3)] space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="relative flex h-3.5 w-3.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-500"></span>
+                    </span>
+                    <div>
+                      <h4 className="text-base sm:text-lg font-black text-amber-200">
+                        🚨 {orders.filter((o) => o.paymentStatus === 'pending').length}টি নতুন অর্ডারের পেমেন্ট ভেরিফিকেশনের জন্য অপেক্ষমান!
+                      </h4>
+                      <p className="text-xs text-amber-300/80">
+                        ছাত্র-ছাত্রীরা টাকা পাঠিয়ে UTR সাবমিট করেছে। চেক করে অবিলম্বে অ্যাক্সেস দিন।
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setOrderStatusFilter('pending');
+                      setActiveTab('orders');
+                    }}
+                    className="btn-gold-primary px-4 py-2 text-xs font-black rounded-full cursor-pointer shadow-md shrink-0"
+                  >
+                    সকল পেন্ডিং অর্ডার দেখুন ({orders.filter((o) => o.paymentStatus === 'pending').length}) →
+                  </button>
+                </div>
+
+                <div className="divide-y divide-white/10 border border-white/15 rounded-2xl overflow-hidden bg-black/50">
+                  {orders
+                    .filter((o) => o.paymentStatus === 'pending')
+                    .slice(0, 4)
+                    .map((po) => (
+                      <div
+                        key={po.orderId}
+                        className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs hover:bg-white/5 transition-colors"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-black text-[#FFD34E] text-xs bg-black/60 px-2.5 py-0.5 rounded border border-white/20">
+                              {po.orderId}
+                            </span>
+                            <span className="font-extrabold text-white text-sm">{po.studentName}</span>
+                            {po.studentMobile && (
+                              <span className="text-[#FFE7A3] text-xs font-mono font-bold">📱 {po.studentMobile}</span>
+                            )}
+                            <span className="text-white/50 text-[11px]">({po.studentEmail})</span>
+                          </div>
+                          <div className="text-[11px] text-white/80 flex flex-wrap items-center gap-2">
+                            <span>
+                              Subjects: <strong className="text-[#FFE7A3]">{po.items.map((i) => i.subjectCode).join(', ')}</strong>
+                            </span>
+                            <span className="text-white/30">·</span>
+                            <span>
+                              Amount: <strong className="text-[#FFD34E] text-xs font-black">₹{po.totalAmount}</strong>
+                            </span>
+                            <span className="text-white/30">·</span>
+                            <span>
+                              UTR:{' '}
+                              <strong className="font-mono text-white bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-400/30">
+                                {po.paymentReference || 'N/A'}
+                              </strong>
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => handleApproveOrder(po.orderId)}
+                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full font-black text-xs flex items-center gap-1.5 shadow-md transition-transform hover:scale-105 cursor-pointer"
+                          >
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>Approve Access (অনুমোদন দিন)</span>
+                          </button>
+                          <button
+                            onClick={() => handleRejectOrder(po.orderId)}
+                            className="px-3 py-2 bg-rose-600/70 hover:bg-rose-600 text-white rounded-full text-xs font-bold transition-colors cursor-pointer"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
               <div className="liquid-glass-master p-5 rounded-2xl border border-[#FFE7A3]/30 shadow-lg">
                 <span className="text-[11px] font-bold text-[#FFE7A3] uppercase tracking-wider block">
@@ -1000,11 +1110,64 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
         {/* Tab 4: Orders & Transactions */}
         {activeTab === 'orders' && (
           <div className="liquid-glass-master rounded-3xl border border-[#FFE7A3]/30 p-6 sm:p-8 space-y-4 shadow-2xl">
-            <div>
-              <h3 className="text-lg font-black text-white">Order Transactions &amp; Gateway Records</h3>
-              <p className="text-xs text-[#FFE7A3]">
-                Verified payments with student identity, payment reference, and purchased subjects.
-              </p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-black text-white">Order Transactions &amp; Gateway Records</h3>
+                <p className="text-xs text-[#FFE7A3]">
+                  Verified payments with student identity, payment reference, and purchased subjects.
+                </p>
+              </div>
+
+              {/* Search bar */}
+              <div className="relative w-full sm:w-64">
+                <Search className="w-3.5 h-3.5 text-white/50 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                  placeholder="Search student, UTR, order ID..."
+                  className="w-full pl-8 pr-3 py-1.5 text-xs bg-black/40 border border-white/20 rounded-full text-white placeholder-white/40 focus:outline-none focus:border-[#FFD34E]"
+                />
+              </div>
+            </div>
+
+            {/* Status Filter Tabs */}
+            <div className="flex flex-wrap items-center gap-2 pb-1">
+              <button
+                type="button"
+                onClick={() => setOrderStatusFilter('all')}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                  orderStatusFilter === 'all'
+                    ? 'btn-gold-primary shadow-sm'
+                    : 'bg-black/30 text-white/70 hover:text-white border border-white/15'
+                }`}
+              >
+                All Orders ({orders.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setOrderStatusFilter('pending')}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  orderStatusFilter === 'pending'
+                    ? 'bg-amber-400 text-black font-black shadow-sm'
+                    : 'bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 border border-amber-400/40'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>Pending Verification ({orders.filter((o) => o.paymentStatus === 'pending').length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setOrderStatusFilter('verified')}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  orderStatusFilter === 'verified'
+                    ? 'bg-emerald-500 text-black font-black shadow-sm'
+                    : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-400/40'
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Verified &amp; Active ({orders.filter((o) => o.paymentStatus === 'verified').length})</span>
+              </button>
             </div>
 
             <div className="overflow-x-auto border border-white/15 rounded-2xl bg-black/20">
@@ -1022,16 +1185,50 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/10">
-                  {orders.length === 0 ? (
+                  {orders
+                    .filter((o) => {
+                      if (orderStatusFilter === 'pending' && o.paymentStatus !== 'pending') return false;
+                      if (orderStatusFilter === 'verified' && o.paymentStatus !== 'verified') return false;
+                      if (searchFilter.trim()) {
+                        const q = searchFilter.toLowerCase();
+                        const match =
+                          o.orderId.toLowerCase().includes(q) ||
+                          o.studentName.toLowerCase().includes(q) ||
+                          o.studentEmail.toLowerCase().includes(q) ||
+                          (o.studentMobile && o.studentMobile.includes(q)) ||
+                          (o.paymentReference && o.paymentReference.toLowerCase().includes(q));
+                        if (!match) return false;
+                      }
+                      return true;
+                    })
+                    .length === 0 ? (
                     <tr>
                       <td colSpan={8} className="p-8 text-center text-white/50">
-                        No orders recorded yet.
+                        {orderStatusFilter === 'pending'
+                          ? 'কোনো পেন্ডিং অর্ডার নেই (No orders awaiting verification).'
+                          : 'No matching orders found.'}
                       </td>
                     </tr>
                   ) : (
-                    orders.map((o) => (
-                      <tr key={o.orderId} className="hover:bg-white/5">
-                        <td className="p-3.5 font-mono font-bold text-white">{o.orderId}</td>
+                    orders
+                      .filter((o) => {
+                        if (orderStatusFilter === 'pending' && o.paymentStatus !== 'pending') return false;
+                        if (orderStatusFilter === 'verified' && o.paymentStatus !== 'verified') return false;
+                        if (searchFilter.trim()) {
+                          const q = searchFilter.toLowerCase();
+                          const match =
+                            o.orderId.toLowerCase().includes(q) ||
+                            o.studentName.toLowerCase().includes(q) ||
+                            o.studentEmail.toLowerCase().includes(q) ||
+                            (o.studentMobile && o.studentMobile.includes(q)) ||
+                            (o.paymentReference && o.paymentReference.toLowerCase().includes(q));
+                          if (!match) return false;
+                        }
+                        return true;
+                      })
+                      .map((o) => (
+                        <tr key={o.orderId} className="hover:bg-white/5">
+                          <td className="p-3.5 font-mono font-bold text-white">{o.orderId}</td>
                         <td className="p-3.5">
                           <span className="font-bold block text-white">{o.studentName}</span>
                           <span className="text-[11px] text-white/60">{o.studentEmail}</span>
