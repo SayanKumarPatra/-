@@ -19,7 +19,6 @@ import { AuthModal } from './components/AuthModal';
 import { AboutModal } from './components/AboutModal';
 import { ContactModal } from './components/ContactModal';
 import { MobileBottomNav } from './components/MobileBottomNav';
-import { Footer } from './components/Footer';
 import { api } from './services/api';
 import { FALLBACK_PRODUCTS } from './constants/fallbackProducts';
 import { subscribeToProductsRealtime } from './firebase/firebase';
@@ -264,8 +263,6 @@ function AppContent() {
         )}
       </main>
 
-      {/* 6. Compact Footer */}
-      <Footer />
 
       {/* Fast, Clean Online PDF Viewer for Purchased Content */}
       {activeViewerProductId && (

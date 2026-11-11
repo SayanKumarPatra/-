@@ -283,8 +283,9 @@ adminRouter.delete('/products/:id', requireAdmin, (req, res) => {
 
 // --- ORDERS MANAGEMENT ---
 
-adminRouter.get('/orders', requireAdmin, (req, res) => {
+adminRouter.get('/orders', requireAdmin, async (req, res) => {
   try {
+    await db.syncWithFirebaseOrders();
     const orders = db.getOrders();
     res.json({ success: true, orders });
   } catch (error: any) {

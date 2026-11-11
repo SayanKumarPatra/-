@@ -205,9 +205,10 @@ ordersRouter.post('/verify-payment', async (req, res) => {
  * GET /api/orders/user/:userId
  * Fetch orders and purchased subjects for a student
  */
-ordersRouter.get('/user/:userId', (req, res) => {
+ordersRouter.get('/user/:userId', async (req, res) => {
   try {
     const userId = req.params.userId;
+    await db.syncWithFirebaseOrders();
     const orders = db.getStudentOrders(userId);
     const purchases = db.getStudentPurchases(userId);
 

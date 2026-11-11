@@ -70,6 +70,20 @@ export const firebaseSync = {
   },
 
   /**
+   * Fetch all orders currently saved in Firebase Realtime Database
+   */
+  async fetchOrders(): Promise<Record<string, any> | null> {
+    return safeRtdbFetch('orders', 'GET');
+  },
+
+  /**
+   * Fetch all products currently saved in Firebase Realtime Database
+   */
+  async fetchProducts(): Promise<Record<string, any> | null> {
+    return safeRtdbFetch('products', 'GET');
+  },
+
+  /**
    * Delete order from Firebase Realtime Database
    */
   async deleteOrder(orderId: string) {

@@ -68,11 +68,15 @@ export interface Order {
   items: OrderItem[];
   totalAmount: number;
   paymentGatewayOrderId?: string;
+  paymentGatewayPaymentId?: string;
+  paymentGatewaySignature?: string;
   paymentReference?: string;
   paymentStatus: 'pending' | 'verified' | 'failed' | 'cancelled' | 'rejected';
   paymentMethod?: string;
   createdAt: string;
   verifiedAt?: string;
+  rejectionReason?: string;
+  userAgent?: string;
   ipAddress?: string;
 }
 

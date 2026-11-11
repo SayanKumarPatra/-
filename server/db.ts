@@ -56,8 +56,8 @@ const SEED_PRODUCTS: Product[] = [
       'Pipelining Hazards: Structural, Data, & Control',
       'I/O Organization & DMA Controller Architecture',
     ],
-    price: 99,
-    originalPrice: 199,
+    price: 20,
+    originalPrice: 49,
     pageCount: 38,
     privateStoragePath: 'pdfs/bca_maj3_computer_architecture.pdf',
     fileSizeKb: 3450,
@@ -81,8 +81,8 @@ const SEED_PRODUCTS: Product[] = [
       'Monetary and Fiscal Policies & RBI Framework',
       'Globalization, EXIM Policies, and WTO Regulations',
     ],
-    price: 99,
-    originalPrice: 199,
+    price: 20,
+    originalPrice: 49,
     pageCount: 32,
     privateStoragePath: 'pdfs/bca_min3_business_environment.pdf',
     fileSizeKb: 2890,
@@ -106,8 +106,8 @@ const SEED_PRODUCTS: Product[] = [
       'Companies Act 2013 Section 135 CSR Mandate',
       'Environmental Sustainability & Green Business Models',
     ],
-    price: 99,
-    originalPrice: 199,
+    price: 20,
+    originalPrice: 49,
     pageCount: 28,
     privateStoragePath: 'pdfs/bca_mdc3_business_ethics.pdf',
     fileSizeKb: 2450,
@@ -131,8 +131,8 @@ const SEED_PRODUCTS: Product[] = [
       'B+ Trees, Bitmap Indexes & Hash Clustering',
       'Distributed Databases, CAP Theorem, & MongoDB NoSQL Schemas',
     ],
-    price: 129,
-    originalPrice: 249,
+    price: 20,
+    originalPrice: 49,
     pageCount: 46,
     privateStoragePath: 'pdfs/bca_sec3_advanced_databases.pdf',
     fileSizeKb: 4120,
@@ -156,8 +156,8 @@ const SEED_PRODUCTS: Product[] = [
       'Comprehension, Report Writing & Official Correspondence',
       'Past 5 Years Solved University Questions with Model Answers',
     ],
-    price: 79,
-    originalPrice: 149,
+    price: 20,
+    originalPrice: 49,
     pageCount: 30,
     privateStoragePath: 'pdfs/bca_aec3_bengali.pdf',
     fileSizeKb: 2650,
@@ -181,8 +181,8 @@ const SEED_PRODUCTS: Product[] = [
       'Translation from Sanskrit to Bengali / English',
       'University Examination Probable Questions & Answers',
     ],
-    price: 79,
-    originalPrice: 149,
+    price: 20,
+    originalPrice: 49,
     pageCount: 26,
     privateStoragePath: 'pdfs/bca_aec3_sanskrit.pdf',
     fileSizeKb: 2310,
@@ -208,8 +208,8 @@ const SEED_PRODUCTS: Product[] = [
       'Unification & Resolution Refutation Proofs',
       'Expert Systems Architecture & Forward/Backward Chaining',
     ],
-    price: 149,
-    originalPrice: 299,
+    price: 20,
+    originalPrice: 49,
     pageCount: 42,
     privateStoragePath: 'pdfs/bca_spec_ai.pdf',
     fileSizeKb: 3950,
@@ -233,8 +233,8 @@ const SEED_PRODUCTS: Product[] = [
       'Support Vector Machines (SVM) & Kernel Functions',
       'K-Means Clustering, PCA & Cross-Validation Metrics',
     ],
-    price: 149,
-    originalPrice: 299,
+    price: 20,
+    originalPrice: 49,
     pageCount: 44,
     privateStoragePath: 'pdfs/bca_spec_ml.pdf',
     fileSizeKb: 4200,
@@ -258,8 +258,8 @@ const SEED_PRODUCTS: Product[] = [
       'Exploratory Data Analysis (EDA) & Matplotlib/Seaborn Workflows',
       'Dimensionality Reduction & Feature Selection Techniques',
     ],
-    price: 149,
-    originalPrice: 299,
+    price: 20,
+    originalPrice: 49,
     pageCount: 40,
     privateStoragePath: 'pdfs/bca_spec_ds.pdf',
     fileSizeKb: 3880,
@@ -283,8 +283,8 @@ const SEED_PRODUCTS: Product[] = [
       'Network Attack Vectors: MITM, DDoS, SQL Injection & XSS',
       'Firewalls, IDS/IPS Configuration & Security Incident Audits',
     ],
-    price: 149,
-    originalPrice: 299,
+    price: 20,
+    originalPrice: 49,
     pageCount: 40,
     privateStoragePath: 'pdfs/bca_spec_cs.pdf',
     fileSizeKb: 3790,
@@ -308,8 +308,8 @@ const SEED_PRODUCTS: Product[] = [
       'IoT Communication: MQTT, CoAP, ZigBee, and LoRaWAN',
       'Cloud IoT Integration, Edge Computing & Smart City Case Studies',
     ],
-    price: 149,
-    originalPrice: 299,
+    price: 20,
+    originalPrice: 49,
     pageCount: 36,
     privateStoragePath: 'pdfs/bca_spec_iot.pdf',
     fileSizeKb: 3600,
@@ -329,6 +329,106 @@ class Database {
   constructor() {
     this.ensureDirs();
     this.data = this.load();
+
+    // Ensure all 11 BCA question banks have the requested standard ₹20 price
+    for (const prod of this.data.products) {
+      if (!prod.price || prod.price !== 20) {
+        prod.price = 20;
+        prod.originalPrice = 49;
+      }
+    }
+    this.persist();
+
+    // Initial and periodic synchronization with Firebase Realtime Database
+    this.syncWithFirebaseOrders().catch(() => {});
+    setInterval(() => {
+      this.syncWithFirebaseOrders().catch(() => {});
+    }, 4000);
+  }
+
+  async syncWithFirebaseOrders(): Promise<void> {
+    try {
+      const rtdbOrders = await firebaseSync.fetchOrders();
+      if (!rtdbOrders) return;
+      let changed = false;
+      for (const [key, val] of Object.entries<any>(rtdbOrders)) {
+        if (!val || typeof val !== 'object') continue;
+        const ordId = val.orderId || key;
+        const existing = this.data.orders.find((o) => o.orderId === ordId);
+        if (!existing) {
+          const newOrder: Order = {
+            orderId: ordId,
+            userId: val.userId || `std_${ordId}`,
+            studentName: val.studentName || 'Student',
+            studentEmail: val.studentEmail || '',
+            studentMobile: val.studentMobile || '',
+            collegeName: val.collegeName || '',
+            studentId: val.studentId || '',
+            selectedProductIds: val.selectedProductIds || (val.items ? val.items.map((i: any) => i.productId) : []),
+            items: val.items || [],
+            totalAmount: Number(val.totalAmount) || 20,
+            paymentStatus: val.paymentStatus || 'pending',
+            paymentReference: val.paymentReference || val.utrNumber || '',
+            paymentGatewayOrderId: val.paymentGatewayOrderId || '',
+            paymentGatewayPaymentId: val.paymentGatewayPaymentId || '',
+            paymentGatewaySignature: val.paymentGatewaySignature || '',
+            ipAddress: val.ipAddress || '127.0.0.1',
+            userAgent: val.userAgent || '',
+            createdAt: val.createdAt || new Date().toISOString(),
+            verifiedAt: val.verifiedAt,
+            rejectionReason: val.rejectionReason,
+          };
+          this.data.orders.push(newOrder);
+          changed = true;
+
+          // If the order is already verified, grant purchases
+          if (newOrder.paymentStatus === 'verified') {
+            for (const prodId of newOrder.selectedProductIds) {
+              const hasPur = this.data.purchases.some((p) => p.userId === newOrder.userId && p.productId === prodId);
+              if (!hasPur) {
+                this.data.purchases.push({
+                  purchaseId: `pur-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                  userId: newOrder.userId,
+                  productId: prodId,
+                  orderId: newOrder.orderId,
+                  accessStatus: 'active',
+                  createdAt: newOrder.createdAt,
+                });
+              }
+            }
+          }
+        } else {
+          // If status changed in RTDB
+          if (val.paymentStatus && existing.paymentStatus !== val.paymentStatus) {
+            existing.paymentStatus = val.paymentStatus;
+            existing.verifiedAt = val.verifiedAt || existing.verifiedAt;
+            changed = true;
+            if (val.paymentStatus === 'verified') {
+              for (const prodId of existing.selectedProductIds) {
+                const pItem = this.data.purchases.find((p) => p.userId === existing.userId && p.productId === prodId);
+                if (pItem) {
+                  pItem.accessStatus = 'active';
+                } else {
+                  this.data.purchases.push({
+                    purchaseId: `pur-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                    userId: existing.userId,
+                    productId: prodId,
+                    orderId: existing.orderId,
+                    accessStatus: 'active',
+                    createdAt: new Date().toISOString(),
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+      if (changed) {
+        this.persist();
+      }
+    } catch (e) {
+      console.warn('syncWithFirebaseOrders notice:', e);
+    }
   }
 
   private ensureDirs() {

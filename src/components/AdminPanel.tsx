@@ -24,7 +24,12 @@ import {
 } from 'lucide-react';
 import { api, getStoredAdminKey, setStoredAdminKey } from '../services/api';
 import { BRAND } from '../constants/brand';
-import { updateProductRealtime, syncAllOfficialProductsToFirestore } from '../firebase/firebase';
+import {
+  updateProductRealtime,
+  syncAllOfficialProductsToFirestore,
+  subscribeToOrdersRealtime,
+  updateOrderStatusRealtime,
+} from '../firebase/firebase';
 import type { Semester, Product, Order, DeviceBinding, AdminAuditLog } from '../types';
 
 export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
@@ -244,7 +249,29 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
     if (isAuthenticated) {
       loadAllAdminData();
 
-      // Auto-poll orders and stats every 6 seconds so incoming orders appear instantly
+      // Listen directly to Firebase Realtime Database for all live orders
+      const unsubscribeOrders = subscribeToOrdersRealtime((rtdbOrders) => {
+        if (rtdbOrders) {
+          setOrders((currentOrders) => {
+            const map = new Map<string, Order>();
+            // Add RTDB orders first
+            for (const o of rtdbOrders) {
+              if (o.orderId) map.set(o.orderId, o);
+            }
+            // Merge with any current orders
+            for (const o of currentOrders) {
+              if (o.orderId && !map.has(o.orderId)) {
+                map.set(o.orderId, o);
+              }
+            }
+            return Array.from(map.values()).sort(
+              (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            );
+          });
+        }
+      });
+
+      // Auto-poll orders and stats every 5 seconds as a secondary safety net
       const autoRefreshTimer = setInterval(() => {
         Promise.all([
           api.getAdminStats(),
@@ -252,12 +279,31 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
         ])
           .then(([statsData, ordData]) => {
             if (statsData?.stats) setStats(statsData.stats);
-            if (ordData?.orders) setOrders(ordData.orders);
+            if (ordData?.orders && ordData.orders.length > 0) {
+              setOrders((currentOrders) => {
+                const map = new Map<string, Order>();
+                for (const o of currentOrders) {
+                  if (o.orderId) map.set(o.orderId, o);
+                }
+                for (const o of ordData.orders) {
+                  if (o.orderId) {
+                    const existing = map.get(o.orderId);
+                    map.set(o.orderId, { ...existing, ...o });
+                  }
+                }
+                return Array.from(map.values()).sort(
+                  (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                );
+              });
+            }
           })
           .catch(() => {});
-      }, 6000);
+      }, 5000);
 
-      return () => clearInterval(autoRefreshTimer);
+      return () => {
+        unsubscribeOrders();
+        clearInterval(autoRefreshTimer);
+      };
     }
   }, [isAuthenticated]);
 
@@ -372,8 +418,26 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   // Order Approval Actions
   const handleApproveOrder = async (orderId: string) => {
     try {
-      const res = await api.approveOrder(orderId);
-      showSuccessBanner(`✓ অর্ডার ${orderId} সফলভাবে অনুমোদিত হয়েছে এবং পিডিএফ অ্যাক্সেস খুলে দেওয়া হয়েছে!`);
+      // 1. Direct Firebase Realtime Database update
+      await updateOrderStatusRealtime(orderId, 'verified');
+
+      // 2. Direct backend database approval
+      try {
+        await api.approveOrder(orderId);
+      } catch (backendErr) {
+        console.warn('Backend API order approve notice:', backendErr);
+      }
+
+      // 3. Immediately update UI state
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.orderId === orderId
+            ? { ...o, paymentStatus: 'verified', verifiedAt: new Date().toISOString() }
+            : o
+        )
+      );
+
+      showSuccessBanner(`✓ অর্ডার ${orderId} সফলভাবে অনুমোদিত হয়েছে এবং ছাত্রছাত্রীর পিডিএফ অ্যাক্সেস খুলে দেওয়া হয়েছে!`);
       loadAllAdminData();
     } catch (err: any) {
       alert(err.message || 'অর্ডার অনুমোদন করতে সমস্যা হয়েছে');
@@ -384,7 +448,19 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
     const reason = prompt('অর্ডার বাতিলের কারণ লিখুন (Reason for rejection):', 'Payment UTR verification failed');
     if (reason === null) return;
     try {
-      await api.rejectOrder(orderId, reason);
+      await updateOrderStatusRealtime(orderId, 'failed', { rejectionReason: reason });
+      try {
+        await api.rejectOrder(orderId, reason);
+      } catch (backendErr) {
+        console.warn('Backend API order reject notice:', backendErr);
+      }
+
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.orderId === orderId ? { ...o, paymentStatus: 'failed', rejectionReason: reason } : o
+        )
+      );
+
       showSuccessBanner(`অর্ডার ${orderId} বাতিল করা হয়েছে।`);
       loadAllAdminData();
     } catch (err: any) {

@@ -269,3 +269,95 @@ export async function saveOrderRealtime(order: any): Promise<void> {
     console.warn('RTDB order save error:', e);
   }
 }
+
+/**
+ * Real-time Subscription to all Orders from Firebase Realtime Database
+ * Used by AdminPanel to show all incoming live orders instantly
+ * and by student My Notes to track verification status
+ */
+export function subscribeToOrdersRealtime(
+  onUpdate: (orders: any[]) => void,
+  onError?: (err: any) => void
+): () => void {
+  const ordersRef = rtdbRef(rtdb, 'orders');
+  return rtdbOnValue(
+    ordersRef,
+    (snapshot) => {
+      const data = snapshot.val();
+      if (!data) {
+        onUpdate([]);
+        return;
+      }
+
+      const ordersList: any[] = [];
+      const keys = Object.keys(data);
+      for (const key of keys) {
+        const val = data[key];
+        if (!val || typeof val !== 'object') continue;
+        ordersList.push({
+          orderId: val.orderId || key,
+          userId: val.userId || `std_${val.orderId || key}`,
+          studentName: val.studentName || 'Student',
+          studentEmail: val.studentEmail || '',
+          studentMobile: val.studentMobile || '',
+          collegeName: val.collegeName || '',
+          studentId: val.studentId || '',
+          selectedProductIds: val.selectedProductIds || (val.items ? val.items.map((i: any) => i.productId) : []),
+          items: val.items || [],
+          totalAmount: Number(val.totalAmount) || 20,
+          paymentStatus: val.paymentStatus || 'pending',
+          paymentReference: val.paymentReference || val.utrNumber || '',
+          paymentGatewayOrderId: val.paymentGatewayOrderId || '',
+          paymentGatewayPaymentId: val.paymentGatewayPaymentId || '',
+          paymentGatewaySignature: val.paymentGatewaySignature || '',
+          ipAddress: val.ipAddress || '',
+          userAgent: val.userAgent || '',
+          createdAt: val.createdAt || new Date().toISOString(),
+          verifiedAt: val.verifiedAt,
+          rejectionReason: val.rejectionReason,
+        });
+      }
+
+      // Sort newest orders first
+      ordersList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      onUpdate(ordersList);
+    },
+    (err) => {
+      console.warn('RTDB orders subscription notice:', err);
+      if (onError) onError(err);
+    }
+  );
+}
+
+/**
+ * Approve or update order status directly in Firebase Realtime Database
+ */
+export async function updateOrderStatusRealtime(
+  orderId: string,
+  paymentStatus: 'pending' | 'verified' | 'failed',
+  additionalData?: any
+): Promise<void> {
+  const now = new Date().toISOString();
+  try {
+    await rtdbUpdate(rtdbRef(rtdb, `orders/${orderId}`), {
+      paymentStatus,
+      updatedAt: now,
+      ...(paymentStatus === 'verified' ? { verifiedAt: now } : {}),
+      ...(additionalData || {}),
+    });
+  } catch (e) {
+    console.warn('RTDB updateOrderStatusRealtime notice:', e);
+  }
+}
+
+/**
+ * Delete order from Firebase Realtime Database
+ */
+export async function deleteOrderRealtime(orderId: string): Promise<void> {
+  try {
+    await rtdbSet(rtdbRef(rtdb, `orders/${orderId}`), null);
+  } catch (e) {
+    console.warn('RTDB deleteOrderRealtime notice:', e);
+  }
+}
+
