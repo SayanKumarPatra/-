@@ -156,7 +156,18 @@ export function subscribeToProductsRealtime(
         });
       });
 
-      onUpdate(products);
+      // For any official BCA products not yet in Firestore, merge them so all 11 subjects ALWAYS display
+      const mergedProducts: Product[] = [...products];
+      for (const fallback of FALLBACK_PRODUCTS) {
+        const alreadyIncluded = mergedProducts.some(
+          (p) => p.id === fallback.id || p.subjectCode === fallback.subjectCode
+        );
+        if (!alreadyIncluded) {
+          mergedProducts.push(fallback);
+        }
+      }
+
+      onUpdate(mergedProducts);
     },
     (error) => {
       console.warn('Real-time products snapshot warning:', error);

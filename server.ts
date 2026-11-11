@@ -6,6 +6,7 @@ import { productsRouter } from './server/routes/products';
 import { ordersRouter } from './server/routes/orders';
 import { viewerRouter } from './server/routes/viewer';
 import { adminRouter } from './server/routes/admin';
+import { authRouter } from './server/routes/auth';
 import { pdfService } from './server/pdfService';
 
 dotenv.config();
@@ -39,6 +40,7 @@ async function startServer() {
 
   // Mount API Routers
   app.use('/api', productsRouter);
+  app.use('/api/auth', authRouter);
   app.use('/api/checkout', ordersRouter);
   app.use('/api/orders', ordersRouter);
   app.use('/api/viewer', viewerRouter);

@@ -275,6 +275,77 @@ export class PdfService {
   }
 
   /**
+   * Generates a complete, personalized watermarked multi-page PDF for the secure single-stream canvas viewer
+   */
+  async getWatermarkedFullPdf(params: {
+    privateStoragePath: string;
+    studentName: string;
+    studentEmail: string;
+    orderId: string;
+    timestamp: string;
+  }): Promise<{ pdfBytes: Uint8Array; totalPages: number }> {
+    const fullPath = path.join(PDF_STORAGE_DIR, path.basename(params.privateStoragePath));
+    if (!fs.existsSync(fullPath)) {
+      throw new Error(`PDF file not found in private storage: ${params.privateStoragePath}`);
+    }
+
+    const sourceBytes = fs.readFileSync(fullPath);
+    const pdfDoc = await PDFDocument.load(sourceBytes);
+    const totalPages = pdfDoc.getPageCount();
+    const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+    const watermarkText = `BCA STUDY POINT  |  ${params.studentName.toUpperCase()}  |  ${params.studentEmail}  |  ORD: ${params.orderId}  |  ${params.timestamp}`;
+
+    for (let i = 0; i < totalPages; i++) {
+      const page = pdfDoc.getPage(i);
+      const { width, height } = page.getSize();
+
+      // Repeating diagonal watermarks
+      const yOffsets = [height * 0.22, height * 0.48, height * 0.74];
+      for (const yOffset of yOffsets) {
+        page.drawText(watermarkText, {
+          x: 35,
+          y: yOffset,
+          size: 8.5,
+          font: helveticaBold,
+          color: rgb(0.12, 0.25, 0.65),
+          opacity: 0.15,
+          rotate: degrees(30),
+        });
+      }
+
+      // Security bottom banner
+      page.drawRectangle({
+        x: 30,
+        y: 12,
+        width: width - 60,
+        height: 14,
+        color: rgb(0.96, 0.97, 1),
+        borderColor: rgb(0.7, 0.8, 0.95),
+        borderWidth: 0.5,
+        opacity: 0.85,
+      });
+
+      page.drawText(
+        `LICENSED SECURE VIEWER COPY: ${params.studentEmail} (ORDER: ${params.orderId}) - STRICTLY NO SCREENSHOT`,
+        {
+          x: 38,
+          y: 16,
+          size: 6.5,
+          font: helveticaBold,
+          color: rgb(0.15, 0.3, 0.7),
+        }
+      );
+    }
+
+    const watermarkedBytes = await pdfDoc.save();
+    return {
+      pdfBytes: watermarkedBytes,
+      totalPages,
+    };
+  }
+
+  /**
    * Inspect page count of a PDF file
    */
   async inspectPdfPageCount(filePath: string): Promise<number> {

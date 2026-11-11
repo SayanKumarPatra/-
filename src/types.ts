@@ -69,7 +69,7 @@ export interface Order {
   totalAmount: number;
   paymentGatewayOrderId?: string;
   paymentReference?: string;
-  paymentStatus: 'pending' | 'verified' | 'failed' | 'cancelled';
+  paymentStatus: 'pending' | 'verified' | 'failed' | 'cancelled' | 'rejected';
   paymentMethod?: string;
   createdAt: string;
   verifiedAt?: string;
@@ -81,7 +81,7 @@ export interface Purchase {
   userId: string;
   productId: string;
   orderId: string;
-  accessStatus: 'active' | 'revoked';
+  accessStatus: 'active' | 'pending_approval' | 'revoked';
   createdAt: string;
 }
 

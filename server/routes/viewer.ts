@@ -39,9 +39,17 @@ viewerRouter.post('/session', (req, res) => {
       });
     }
 
-    // 1. Check verified purchase
-    const hasPurchased = db.hasPurchased(userId, productId);
-    if (!hasPurchased) {
+    // 1. Check verified purchase and access approval status
+    const purchaseStatus = db.getPurchaseStatus(userId, productId);
+    if (purchaseStatus === 'pending_approval') {
+      return res.status(403).json({
+        success: false,
+        error: 'PENDING_APPROVAL',
+        message: 'আপনার পেমেন্ট ভেরিফিকেশন চলছে। অ্যাডমিন অ্যাক্সেস দিলেই এই বিষয়ের প্রশ্নপত্র দেখতে পাবেন (সাধারণত ১০-২০ মিনিট সময় লাগে)।',
+      });
+    }
+
+    if (purchaseStatus !== 'active') {
       return res.status(403).json({
         success: false,
         error: 'UNPURCHASED_CONTENT',
@@ -289,6 +297,67 @@ viewerRouter.get('/page', async (req, res) => {
     res.send(Buffer.from(pdfBytes));
   } catch (error: any) {
     console.error('Error serving watermarked page:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/viewer/document
+ * Returns complete personalized watermarked PDF for continuous canvas stream rendering
+ */
+viewerRouter.get('/document', async (req, res) => {
+  try {
+    const token = req.query.token as string;
+    if (!token) {
+      return res.status(401).json({ success: false, error: 'Session token required' });
+    }
+
+    const session = db.getViewerSession(token);
+    if (!session) {
+      return res.status(401).json({
+        success: false,
+        error: 'SESSION_EXPIRED',
+        message: 'Security session expired. Please reopen the document.',
+      });
+    }
+
+    const product = db.getProduct(session.productId);
+    if (!product) {
+      return res.status(404).json({ success: false, error: 'Document not found' });
+    }
+
+    const fullPath = path.join(PDF_STORAGE_DIR, path.basename(product.privateStoragePath));
+    if (!fs.existsSync(fullPath)) {
+      return res.status(404).json({
+        success: false,
+        error: 'FILE_NOT_FOUND',
+        message: 'PDF document not found in private storage',
+      });
+    }
+
+    const { pdfBytes, totalPages } = await pdfService.getWatermarkedFullPdf({
+      privateStoragePath: product.privateStoragePath,
+      studentName: session.studentName,
+      studentEmail: session.studentEmail,
+      orderId: session.orderId,
+      timestamp: new Date().toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      }),
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Length', pdfBytes.length);
+    res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('X-Total-Pages', totalPages);
+    res.setHeader('Content-Disposition', 'inline; filename="protected-document.pdf"');
+
+    res.send(Buffer.from(pdfBytes));
+  } catch (error: any) {
+    console.error('Error serving full watermarked document:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

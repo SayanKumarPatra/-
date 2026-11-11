@@ -291,6 +291,41 @@ adminRouter.get('/orders', requireAdmin, (req, res) => {
   }
 });
 
+adminRouter.post('/orders/:orderId/approve', requireAdmin, (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const result = db.approveOrder(orderId, 'admin');
+    if (!result.success) {
+      return res.status(404).json({ success: false, error: result.error });
+    }
+    res.json({
+      success: true,
+      message: `Order ${orderId} approved successfully. Student access unlocked.`,
+      order: result.order,
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+adminRouter.post('/orders/:orderId/reject', requireAdmin, (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { reason } = req.body || {};
+    const result = db.rejectOrder(orderId, 'admin', reason);
+    if (!result.success) {
+      return res.status(404).json({ success: false, error: result.error });
+    }
+    res.json({
+      success: true,
+      message: `Order ${orderId} rejected.`,
+      order: result.order,
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // --- DEVICE MANAGEMENT & ADMIN DEVICE RESET ---
 
 adminRouter.get('/devices', requireAdmin, (req, res) => {

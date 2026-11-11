@@ -337,6 +337,29 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
     }
   };
 
+  // Order Approval Actions
+  const handleApproveOrder = async (orderId: string) => {
+    try {
+      const res = await api.approveOrder(orderId);
+      showSuccessBanner(`✓ অর্ডার ${orderId} সফলভাবে অনুমোদিত হয়েছে এবং পিডিএফ অ্যাক্সেস খুলে দেওয়া হয়েছে!`);
+      loadAllAdminData();
+    } catch (err: any) {
+      alert(err.message || 'অর্ডার অনুমোদন করতে সমস্যা হয়েছে');
+    }
+  };
+
+  const handleRejectOrder = async (orderId: string) => {
+    const reason = prompt('অর্ডার বাতিলের কারণ লিখুন (Reason for rejection):', 'Payment UTR verification failed');
+    if (reason === null) return;
+    try {
+      await api.rejectOrder(orderId, reason);
+      showSuccessBanner(`অর্ডার ${orderId} বাতিল করা হয়েছে।`);
+      loadAllAdminData();
+    } catch (err: any) {
+      alert(err.message || 'অর্ডার বাতিল করতে সমস্যা হয়েছে');
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-b from-[#65000D] via-[#3D0009] to-[#240005]">
@@ -930,14 +953,15 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
                     <th className="p-3.5">Subjects</th>
                     <th className="p-3.5">Amount</th>
                     <th className="p-3.5">Status</th>
-                    <th className="p-3.5">Gateway Ref</th>
+                    <th className="p-3.5">Gateway / UTR</th>
                     <th className="p-3.5">Date</th>
+                    <th className="p-3.5 text-center">Action / Approval</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/10">
                   {orders.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="p-8 text-center text-white/50">
+                      <td colSpan={8} className="p-8 text-center text-white/50">
                         No orders recorded yet.
                       </td>
                     </tr>
@@ -948,6 +972,9 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
                         <td className="p-3.5">
                           <span className="font-bold block text-white">{o.studentName}</span>
                           <span className="text-[11px] text-white/60">{o.studentEmail}</span>
+                          {o.studentMobile && (
+                            <span className="text-[10px] text-[#FFE7A3] block font-mono">📱 {o.studentMobile}</span>
+                          )}
                         </td>
                         <td className="p-3.5 font-semibold text-[#FFE7A3]">
                           {o.items.map((i) => i.subjectCode).join(', ')}
@@ -960,22 +987,62 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
                             className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                               o.paymentStatus === 'verified'
                                 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'
-                                : 'bg-amber-500/20 text-amber-300 border border-amber-400/40'
+                                : o.paymentStatus === 'rejected' || o.paymentStatus === 'failed'
+                                ? 'bg-rose-500/20 text-rose-300 border border-rose-400/40'
+                                : 'bg-amber-500/20 text-amber-300 border border-amber-400/40 animate-pulse'
                             }`}
                           >
-                            {o.paymentStatus.toUpperCase()}
+                            {o.paymentStatus === 'verified'
+                              ? 'VERIFIED & ACTIVE'
+                              : o.paymentStatus === 'rejected'
+                              ? 'REJECTED'
+                              : 'PENDING VERIFICATION'}
                           </span>
                         </td>
-                        <td className="p-3.5 font-mono text-[10px] text-white/70 truncate max-w-[120px]">
+                        <td className="p-3.5 font-mono text-[11px] text-[#FFD34E] font-bold truncate max-w-[140px]">
                           {o.paymentReference || 'N/A'}
                         </td>
-                        <td className="p-3.5 text-white/70 whitespace-nowrap">
+                        <td className="p-3.5 text-white/70 whitespace-nowrap text-[11px]">
                           {new Date(o.createdAt).toLocaleDateString('en-IN', {
                             day: 'numeric',
                             month: 'short',
                             hour: '2-digit',
                             minute: '2-digit',
                           })}
+                        </td>
+                        <td className="p-3.5 text-center whitespace-nowrap">
+                          {o.paymentStatus === 'pending' ? (
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => handleApproveOrder(o.orderId)}
+                                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full text-[11px] font-black flex items-center gap-1 shadow-sm transition-colors cursor-pointer"
+                                title="Approve payment & unlock PDF access"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Approve Access</span>
+                              </button>
+                              <button
+                                onClick={() => handleRejectOrder(o.orderId)}
+                                className="px-2.5 py-1 bg-rose-600/80 hover:bg-rose-600 text-white rounded-full text-[11px] font-bold transition-colors cursor-pointer"
+                                title="Reject order"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                                <span>Reject</span>
+                              </button>
+                            </div>
+                          ) : o.paymentStatus === 'verified' ? (
+                            <div className="flex items-center justify-center gap-1 text-emerald-400 font-bold text-[11px]">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                              <span>Granted</span>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleApproveOrder(o.orderId)}
+                              className="px-2.5 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-400/40 rounded-full text-[10px] font-bold hover:bg-amber-500/30 cursor-pointer"
+                            >
+                              Re-Approve
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))

@@ -26,9 +26,9 @@
       ],
       "price": 99,
       "originalPrice": 199,
-      "pageCount": 38,
+      "pageCount": 3,
       "privateStoragePath": "pdfs/bca_maj3_computer_architecture.pdf",
-      "fileSizeKb": 3450,
+      "fileSizeKb": 212,
       "published": true,
       "examYear": "2024-2025 Edition",
       "paperType": "core",
@@ -51,9 +51,9 @@
       ],
       "price": 99,
       "originalPrice": 199,
-      "pageCount": 32,
+      "pageCount": 3,
       "privateStoragePath": "pdfs/bca_min3_business_environment.pdf",
-      "fileSizeKb": 2890,
+      "fileSizeKb": 215,
       "published": true,
       "examYear": "2024-2025 Edition",
       "paperType": "core",
@@ -76,9 +76,9 @@
       ],
       "price": 99,
       "originalPrice": 199,
-      "pageCount": 28,
+      "pageCount": 2,
       "privateStoragePath": "pdfs/bca_mdc3_business_ethics.pdf",
-      "fileSizeKb": 2450,
+      "fileSizeKb": 180,
       "published": true,
       "examYear": "2024-2025 Edition",
       "paperType": "core",
@@ -101,9 +101,9 @@
       ],
       "price": 129,
       "originalPrice": 249,
-      "pageCount": 46,
+      "pageCount": 3,
       "privateStoragePath": "pdfs/bca_sec3_advanced_databases.pdf",
-      "fileSizeKb": 4120,
+      "fileSizeKb": 224,
       "published": true,
       "examYear": "2024-2025 Edition",
       "paperType": "core",
@@ -126,9 +126,9 @@
       ],
       "price": 79,
       "originalPrice": 149,
-      "pageCount": 30,
+      "pageCount": 1,
       "privateStoragePath": "pdfs/bca_aec3_bengali.pdf",
-      "fileSizeKb": 2650,
+      "fileSizeKb": 172,
       "published": true,
       "examYear": "2024-2025 Edition",
       "paperType": "core",
@@ -151,9 +151,9 @@
       ],
       "price": 79,
       "originalPrice": 149,
-      "pageCount": 26,
+      "pageCount": 1,
       "privateStoragePath": "pdfs/bca_aec3_sanskrit.pdf",
-      "fileSizeKb": 2310,
+      "fileSizeKb": 191,
       "published": true,
       "examYear": "2024-2025 Edition",
       "paperType": "core",
@@ -176,9 +176,9 @@
       ],
       "price": 149,
       "originalPrice": 299,
-      "pageCount": 42,
+      "pageCount": 3,
       "privateStoragePath": "pdfs/bca_spec_ai.pdf",
-      "fileSizeKb": 3950,
+      "fileSizeKb": 257,
       "published": true,
       "examYear": "2024-2025 Edition",
       "paperType": "specialization",
@@ -201,9 +201,9 @@
       ],
       "price": 149,
       "originalPrice": 299,
-      "pageCount": 44,
+      "pageCount": 4,
       "privateStoragePath": "pdfs/bca_spec_ml.pdf",
-      "fileSizeKb": 4200,
+      "fileSizeKb": 224,
       "published": true,
       "examYear": "2024-2025 Edition",
       "paperType": "specialization",
@@ -226,9 +226,9 @@
       ],
       "price": 149,
       "originalPrice": 299,
-      "pageCount": 40,
+      "pageCount": 3,
       "privateStoragePath": "pdfs/bca_spec_ds.pdf",
-      "fileSizeKb": 3880,
+      "fileSizeKb": 216,
       "published": true,
       "examYear": "2024-2025 Edition",
       "paperType": "specialization",
@@ -251,9 +251,9 @@
       ],
       "price": 149,
       "originalPrice": 299,
-      "pageCount": 40,
+      "pageCount": 3,
       "privateStoragePath": "pdfs/bca_spec_cs.pdf",
-      "fileSizeKb": 3790,
+      "fileSizeKb": 215,
       "published": true,
       "examYear": "2024-2025 Edition",
       "paperType": "specialization",
@@ -276,9 +276,9 @@
       ],
       "price": 149,
       "originalPrice": 299,
-      "pageCount": 36,
+      "pageCount": 3,
       "privateStoragePath": "pdfs/bca_spec_iot.pdf",
-      "fileSizeKb": 3600,
+      "fileSizeKb": 217,
       "published": true,
       "examYear": "2024-2025 Edition",
       "paperType": "specialization",
@@ -288,18 +288,117 @@
       "updatedAt": "2026-11-10T00:00:00.000Z"
     }
   ],
-  "students": [],
-  "orders": [],
-  "purchases": [],
-  "devices": [],
-  "viewerSessions": [],
+  "students": [
+    {
+      "id": "std-1794377226218-rb16k",
+      "email": "sourav@gmail.com",
+      "fullName": "Sourav Das",
+      "mobile": "9876543210",
+      "registeredAt": "2026-11-11T06:07:06.218Z",
+      "lastLoginAt": "2026-11-11T06:07:16.055Z",
+      "lastIp": "127.0.0.1"
+    }
+  ],
+  "orders": [
+    {
+      "orderId": "ORD-202611-63B905",
+      "userId": "std-1794377226218-rb16k",
+      "studentName": "Sourav Das",
+      "studentEmail": "sourav@gmail.com",
+      "studentMobile": "9876543210",
+      "selectedProductIds": [
+        "prod-bca-maj3"
+      ],
+      "items": [
+        {
+          "productId": "prod-bca-maj3",
+          "subjectName": "COMPUTER ARCHITECTURE MAJ-3",
+          "subjectCode": "MAJ-3",
+          "price": 99
+        }
+      ],
+      "totalAmount": 99,
+      "paymentGatewayOrderId": "rzp_test_ord_1794377236056_3beb5b3a",
+      "paymentStatus": "verified",
+      "createdAt": "2026-11-11T06:07:16.056Z",
+      "ipAddress": "127.0.0.1",
+      "paymentReference": "upi_431209845612",
+      "verifiedAt": "2026-11-11T06:07:48.010Z"
+    }
+  ],
+  "purchases": [
+    {
+      "purchaseId": "pur-1794377242730-apg9",
+      "userId": "std-1794377226218-rb16k",
+      "productId": "prod-bca-maj3",
+      "orderId": "ORD-202611-63B905",
+      "accessStatus": "active",
+      "createdAt": "2026-11-11T06:07:22.730Z"
+    }
+  ],
+  "devices": [
+    {
+      "id": "dev-1794377273338",
+      "userId": "std-1794377226218-rb16k",
+      "userEmail": "sourav@gmail.com",
+      "studentName": "Sourav Das",
+      "deviceTokenHash": "22b9e9854fdea9d9e233520fb16c5b8eabd282b2e80a0cec0681f15142d349fd",
+      "deviceDescription": "Web Browser",
+      "os": "Windows",
+      "browser": "Chrome",
+      "registeredAt": "2026-11-11T06:07:53.338Z",
+      "lastSeenAt": "2026-11-11T06:07:53.338Z",
+      "lastIp": "127.0.0.1",
+      "registrationStatus": "active",
+      "resetCount": 0
+    }
+  ],
+  "viewerSessions": [
+    {
+      "sessionId": "vses-1794377273339-f12477aa",
+      "token": "cd806c5cdf158482c36cfa978bd69bac6d6477e0b30de75cb6bc7858ed027b63",
+      "userId": "std-1794377226218-rb16k",
+      "productId": "prod-bca-maj3",
+      "deviceTokenHash": "22b9e9854fdea9d9e233520fb16c5b8eabd282b2e80a0cec0681f15142d349fd",
+      "studentName": "Sourav Das",
+      "studentEmail": "sourav@gmail.com",
+      "orderId": "ORD-202611-63B905",
+      "expiresAt": 1794378173339,
+      "createdAt": "2026-11-11T06:07:53.339Z"
+    }
+  ],
   "adminAuditLogs": [
+    {
+      "adminId": "admin",
+      "action": "APPROVE_ORDER",
+      "targetId": "ORD-202611-63B905",
+      "targetType": "ORDER",
+      "details": "Approved payment for order ORD-202611-63B905 (Sourav Das, ₹99). Full PDF access granted for 1 subjects.",
+      "id": "log-1794377268010-nmrv",
+      "timestamp": "2026-11-11T06:07:48.010Z"
+    },
+    {
+      "adminId": "payment-submission",
+      "action": "PAYMENT_SUBMITTED_FOR_VERIFICATION",
+      "targetId": "ORD-202611-63B905",
+      "targetType": "ORDER",
+      "details": "Payment submitted ₹99 by Sourav Das (sourav@gmail.com). Reference: upi_431209845612. Awaiting Admin verification before unlocking access.",
+      "id": "log-1794377242730-vvgj",
+      "timestamp": "2026-11-11T06:07:22.730Z"
+    },
+    {
+      "adminId": "admin_session",
+      "action": "ADMIN_LOGIN",
+      "details": "Administrator logged into management console.",
+      "id": "log-1794376429439-yjbl",
+      "timestamp": "2026-11-11T05:53:49.439Z"
+    },
     {
       "id": "log-seed-1",
       "adminId": "system",
       "action": "SYSTEM_CLEAN_BOOTSTRAP",
-      "details": "Database cleared and re-initialized with 11 official BCA 3rd Sem subjects and verified 3D covers.",
-      "timestamp": "2026-11-10T21:00:00.000Z"
+      "details": "Database updated with 11 real official university Question Bank PDFs and verified page counts.",
+      "timestamp": "2026-11-10T21:45:00.000Z"
     }
   ]
 }

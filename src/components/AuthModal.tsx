@@ -3,6 +3,7 @@ import { X, Lock, Mail, Phone, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { BRAND } from '../constants/brand';
 
+import { api } from '../services/api';
 import { auth, googleProvider } from '../firebase/firebase';
 import { signInWithPopup } from 'firebase/auth';
 
@@ -36,25 +37,36 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     try {
       const res = await signInWithPopup(auth, googleProvider);
       if (res.user) {
+        // Register or retrieve user in server db
+        const cleanMobile = res.user.phoneNumber?.replace(/\D/g, '') || '';
+        const userEmail = res.user.email || `${res.user.uid}@student.bcastudypoint.com`;
+        const userName = res.user.displayName || userEmail.split('@')[0] || 'BCA Student';
+
         loginStudent({
           id: res.user.uid,
-          email: res.user.email || '',
-          fullName: res.user.displayName || res.user.email?.split('@')[0] || 'BCA Scholar',
-          mobile: res.user.phoneNumber || '',
+          email: userEmail,
+          fullName: userName,
+          mobile: cleanMobile,
         });
+
         if (onSuccess) onSuccess();
         onClose();
       }
     } catch (err: any) {
       console.warn('Google sign in note:', err);
-      // If popup blocked or cancelled, let student continue with email
-      setError(err.message || 'Google Sign-In was cancelled. You can register with email below.');
+      if (err.code === 'auth/unauthorized-domain' || err.message?.includes('unauthorized-domain')) {
+        setError('Google Sign-in ডোমেইন ফায়ারবেসে কনফিগার করা নেই। আপনি সরাসরি নীচের মোবাইল নম্বর বা ইমেইল দিয়ে রেজিস্টার করতে পারেন।');
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        setError('Google Sign-In বাতিল হয়েছে। প্রয়োজনে নীচের ফর্মের সাহায্যে রেজিস্টার করুন।');
+      } else {
+        setError(err.message || 'Google Sign-in সম্পন্ন করা যায়নি। আপনি নাম ও মোবাইল দিয়ে রেজিস্টার করতে পারেন।');
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -62,36 +74,69 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     if (isRegister) {
       if (!fullName.trim() || fullName.trim().length < 2) {
-        setError('দয়া করে আপনার সম্পূর্ণ নাম লিখুন (Please enter your full name).');
+        setError('দয়া করে আপনার সম্পূর্ণ নাম লিখুন।');
         return;
       }
       if (cleanMobile.length < 10) {
-        setError('দয়া করে একটি সঠিক ১০ সংখ্যার মোবাইল নম্বর লিখুন (Please enter valid 10-digit mobile number).');
+        setError('দয়া করে একটি সঠিক ১০ সংখ্যার মোবাইল নম্বর লিখুন।');
         return;
       }
+
+      setIsLoading(true);
+      try {
+        const cleanEmail = email.trim();
+        const effectiveEmail = cleanEmail || `${cleanMobile}@student.bcastudypoint.com`;
+
+        const regRes = await api.studentRegister({
+          fullName: fullName.trim(),
+          email: effectiveEmail,
+          mobile: cleanMobile,
+          collegeName: collegeName.trim() || undefined,
+        });
+
+        loginStudent({
+          id: regRes.student.id,
+          fullName: regRes.student.fullName,
+          email: regRes.student.email,
+          mobile: regRes.student.mobile,
+          collegeName: regRes.student.collegeName,
+        });
+
+        if (onSuccess) onSuccess();
+        onClose();
+      } catch (err: any) {
+        setError(err.message || 'রেজিস্ট্রেশন ব্যর্থ হয়েছে। অন্য মোবাইল নম্বর দিয়ে চেষ্টা করুন।');
+      } finally {
+        setIsLoading(false);
+      }
     } else {
-      const isMobileOnly = /^\d{10}$/.test(email.trim().replace(/\D/g, ''));
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!isMobileOnly && (!email.trim() || !emailRegex.test(email.trim()))) {
+      // SIGN IN MODE: Must verify existing registered student
+      const identifier = email.trim();
+      if (!identifier) {
         setError('দয়া করে আপনার রেজিস্টার্ড ইমেইল বা ১০ সংখ্যার মোবাইল নম্বর লিখুন।');
         return;
       }
+
+      setIsLoading(true);
+      try {
+        const loginRes = await api.studentLogin(identifier);
+
+        loginStudent({
+          id: loginRes.student.id,
+          fullName: loginRes.student.fullName,
+          email: loginRes.student.email,
+          mobile: loginRes.student.mobile,
+          collegeName: loginRes.student.collegeName,
+        });
+
+        if (onSuccess) onSuccess();
+        onClose();
+      } catch (err: any) {
+        setError(err.message || 'এই ইমেইল বা মোবাইল নম্বরে কোনো অ্যাকাউন্ট পাওয়া যায়নি। দয়া করে প্রথমে "Register" করুন।');
+      } finally {
+        setIsLoading(false);
+      }
     }
-
-    const resolvedEmail = email.trim() || `${cleanMobile}@student.bcastudypoint.com`;
-    const resolvedMobile = cleanMobile || (/^\d{10}$/.test(email.replace(/\D/g, '')) ? email.replace(/\D/g, '') : '');
-    const studentId = `std_${resolvedMobile || Date.now()}`;
-
-    loginStudent({
-      id: studentId,
-      email: resolvedEmail.toLowerCase(),
-      fullName: fullName.trim() || (resolvedMobile ? `Student ${resolvedMobile.slice(-4)}` : resolvedEmail.split('@')[0]),
-      mobile: resolvedMobile,
-      collegeName: collegeName.trim() || undefined,
-    });
-
-    if (onSuccess) onSuccess();
-    onClose();
   };
 
   return (

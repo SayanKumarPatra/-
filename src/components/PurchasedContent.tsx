@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BookOpen, ShieldCheck, Laptop, Lock, ArrowRight, Loader2, RefreshCw } from 'lucide-react';
+import { BookOpen, ShieldCheck, Laptop, Lock, ArrowRight, Loader2, RefreshCw, Clock } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { BRAND } from '../constants/brand';
@@ -170,21 +170,56 @@ export const PurchasedContent: React.FC<PurchasedContentProps> = ({
                     <span aria-hidden="true" className="text-white/30">·</span>
                     <span>Order: {item.orderId}</span>
                     <span aria-hidden="true" className="text-white/30">·</span>
-                    <span className="inline-flex items-center gap-1 text-emerald-400 font-semibold">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                      Active &amp; Protected
-                    </span>
+                    {item.accessStatus === 'active' ? (
+                      <span className="inline-flex items-center gap-1 text-emerald-400 font-semibold">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                        Active &amp; Protected
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-amber-300 font-semibold bg-amber-500/20 px-2 py-0.5 rounded-md border border-amber-400/40">
+                        <Clock className="w-3 h-3 text-amber-300 animate-pulse" />
+                        ভেরিফিকেশন চলছে (Pending Admin Approval)
+                      </span>
+                    )}
                   </div>
+
+                  {item.accessStatus !== 'active' && (
+                    <p className="mt-2 text-[11px] text-[#FFE7A3] bg-black/40 px-3 py-1.5 rounded-xl border border-white/10 max-w-lg">
+                      ⚠️ আপনার পেমেন্ট ভেরিফিকেশন চলছে। অ্যাডমিন অ্যাক্সেস দিলেই এই প্রশ্নপত্রটি ওপেন করতে পারবেন (১০-২০ মিনিট সময় লাগে)।
+                    </p>
+                  )}
                 </div>
 
-                <div className="shrink-0">
-                  <button
-                    onClick={() => onOpenViewer(item.productId)}
-                    className="btn-gold-primary w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 text-xs font-extrabold rounded-full cursor-pointer whitespace-nowrap shadow-[0_4px_15px_rgba(255,211,78,0.35)]"
-                  >
-                    <BookOpen className="w-4 h-4" />
-                    <span>Open Question Bank</span>
-                  </button>
+                <div className="shrink-0 flex flex-col sm:flex-row items-center gap-2">
+                  {item.accessStatus === 'active' ? (
+                    <button
+                      onClick={() => onOpenViewer(item.productId)}
+                      className="btn-gold-primary w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 text-xs font-extrabold rounded-full cursor-pointer whitespace-nowrap shadow-[0_4px_15px_rgba(255,211,78,0.35)]"
+                    >
+                      <BookOpen className="w-4 h-4" />
+                      <span>Open Question Bank</span>
+                    </button>
+                  ) : (
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                      <button
+                        disabled
+                        className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-5 py-2.5 text-xs font-bold rounded-full bg-white/10 text-white/50 border border-white/20 cursor-not-allowed"
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>Awaiting Approval (অপেক্ষা করুন)</span>
+                      </button>
+                      <a
+                        href={`https://wa.me/91${BRAND.payment?.whatsappPhone || '9382040746'}?text=${encodeURIComponent(
+                          `Hello BCA STUDY POINT,\nMy order ${item.orderId} is pending verification for subject ${item.subjectCode}. Please approve my access.`
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2.5 text-xs font-bold rounded-full bg-emerald-600/80 hover:bg-emerald-500 text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <span>WhatsApp Help</span>
+                      </a>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

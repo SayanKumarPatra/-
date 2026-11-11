@@ -235,34 +235,34 @@ ordersRouter.post('/verify-payment', async (req, res) => {
       });
     }
 
-    // Mark verified
-    const verifiedAt = new Date().toISOString();
+    // Keep order status as pending verification until admin manually reviews and approves
+    const submittedAt = new Date().toISOString();
     db.updateOrder(orderId, {
-      paymentStatus: 'verified',
+      paymentStatus: 'pending',
       paymentReference: razorpayPaymentId,
-      verifiedAt,
     });
 
-    // Grant access to selected subjects
-    const purchases = db.grantPurchases(order.userId, order.orderId, order.selectedProductIds);
+    // Grant purchases with status 'pending_approval' (Admin verification gate)
+    const purchases = db.grantPurchases(order.userId, order.orderId, order.selectedProductIds, 'pending_approval');
 
     // Audit log
     db.logAdminAction({
-      adminId: 'payment-gateway',
-      action: 'PAYMENT_VERIFIED',
+      adminId: 'payment-submission',
+      action: 'PAYMENT_SUBMITTED_FOR_VERIFICATION',
       targetId: orderId,
       targetType: 'ORDER',
-      details: `Verified payment ₹${order.totalAmount} for ${order.studentEmail}. Reference: ${razorpayPaymentId}. Granted ${purchases.length} question bank(s).`,
+      details: `Payment submitted ₹${order.totalAmount} by ${order.studentName} (${order.studentEmail}). Reference: ${razorpayPaymentId}. Awaiting Admin verification before unlocking access.`,
     });
 
     res.json({
       success: true,
-      message: 'Payment successfully verified. Question bank access granted!',
+      pendingApproval: true,
+      message: 'আপনার পেমেন্টের তথ্য গ্রহণ করা হয়েছে। অ্যাডমিন পেমেন্ট ভেরিফাই করে ১০-২০ মিনিটের মধ্যে অ্যাক্সেস অন করে দেবে।',
       orderId: order.orderId,
       userId: order.userId,
       purchasedProductIds: order.selectedProductIds,
       totalAmount: order.totalAmount,
-      verifiedAt,
+      submittedAt,
     });
   } catch (error: any) {
     console.error('Payment verification error:', error);

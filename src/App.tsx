@@ -96,10 +96,14 @@ function AppContent() {
       api
         .getStudentPurchases(student.id)
         .then((data) => {
-          const ids = data.purchases.map((p) => p.productId);
-          setPurchasedProductIds(ids);
-          // Remove already-purchased products from cart
-          setSelectedProductIds((prev) => prev.filter((id) => !ids.includes(id)));
+          const activeIds = data.purchases
+            .filter((p: any) => p.accessStatus === 'active')
+            .map((p: any) => p.productId);
+          const allPurchasedIds = data.purchases.map((p: any) => p.productId);
+
+          setPurchasedProductIds(activeIds);
+          // Remove already-purchased/pending products from cart
+          setSelectedProductIds((prev) => prev.filter((id) => !allPurchasedIds.includes(id)));
         })
         .catch((err) => {
           console.error('Error fetching student purchases:', err);

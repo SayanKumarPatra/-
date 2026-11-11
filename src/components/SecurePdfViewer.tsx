@@ -1,7 +1,6 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   X,
-  Shield,
   AlertTriangle,
   ZoomIn,
   ZoomOut,
@@ -11,10 +10,16 @@ import {
   Lock,
   ChevronDown,
   ChevronUp,
+  RefreshCw,
+  Eye,
 } from 'lucide-react';
+import * as pdfjsLib from 'pdfjs-dist';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { BRAND } from '../constants/brand';
+
+// Configure PDF.js Worker to guarantee zero-fail rendering across all browsers
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 interface SecurePdfViewerProps {
   productId: string;
@@ -22,12 +27,181 @@ interface SecurePdfViewerProps {
   onDeviceMismatch: (registeredDevice: any, supportInfo: any) => void;
 }
 
-interface PageState {
+interface SinglePageProps {
+  pdfDoc: any;
   pageNumber: number;
-  blobUrl: string | null;
-  loading: boolean;
-  error: string | null;
+  zoomLevel: number;
+  studentName: string;
+  studentMobile: string;
+  orderId: string;
+  onInView: (pageNumber: number) => void;
 }
+
+const SinglePageCanvas: React.FC<SinglePageProps> = ({
+  pdfDoc,
+  pageNumber,
+  zoomLevel,
+  studentName,
+  studentMobile,
+  orderId,
+  onInView,
+}) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isRendered, setIsRendered] = useState(false);
+  const [renderError, setRenderError] = useState<string | null>(null);
+  const renderTaskRef = useRef<any>(null);
+
+  // In-view observer for page counter
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          onInView(pageNumber);
+        }
+      },
+      { threshold: 0.4 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [pageNumber, onInView]);
+
+  // Render PDF page to HTML5 Canvas
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function renderPage() {
+      if (!pdfDoc || !canvasRef.current) return;
+
+      try {
+        if (renderTaskRef.current) {
+          try {
+            renderTaskRef.current.cancel();
+          } catch {
+            // ignore cancel error
+          }
+        }
+
+        const page = await pdfDoc.getPage(pageNumber);
+        if (isCancelled || !canvasRef.current) return;
+
+        // Base scale for crystal clear HD rendering
+        const baseScale = 1.6;
+        const scale = (baseScale * zoomLevel) / 100;
+        const viewport = page.getViewport({ scale });
+
+        const canvas = canvasRef.current;
+        const context = canvas.getContext('2d');
+        if (!context) return;
+
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        const renderContext = {
+          canvasContext: context,
+          viewport,
+        };
+
+        const task = page.render(renderContext);
+        renderTaskRef.current = task;
+        await task.promise;
+
+        if (!isCancelled) {
+          setIsRendered(true);
+          setRenderError(null);
+        }
+      } catch (err: any) {
+        if (err?.name !== 'RenderingCancelledException' && !isCancelled) {
+          console.error(`Page ${pageNumber} render failure:`, err);
+          setRenderError('Could not render page');
+        }
+      }
+    }
+
+    renderPage();
+
+    return () => {
+      isCancelled = true;
+      if (renderTaskRef.current) {
+        try {
+          renderTaskRef.current.cancel();
+        } catch {
+          // ignore
+        }
+      }
+    };
+  }, [pdfDoc, pageNumber, zoomLevel]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] border border-slate-300 overflow-hidden select-none mb-6 max-w-full transition-all"
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      {/* Top Page Header Tag */}
+      <div className="bg-slate-100 border-b border-slate-200 px-4 py-1.5 flex items-center justify-between text-[11px] text-slate-600 font-mono">
+        <span className="font-bold text-[#970014]">
+          Page {pageNumber} of {pdfDoc?.numPages || 1}
+        </span>
+        <span className="text-[10px] text-slate-500">
+          BCA STUDY POINT · Official Question Bank
+        </span>
+      </div>
+
+      {/* Canvas Container */}
+      <div className="relative overflow-hidden flex items-center justify-center bg-slate-50 min-h-[300px]">
+        {/* Loading Spinner */}
+        {!isRendered && !renderError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 text-slate-500 z-10">
+            <Loader2 className="w-8 h-8 animate-spin text-[#970014] mb-2" />
+            <span className="text-xs font-bold text-slate-600">
+              Rendering Page {pageNumber}...
+            </span>
+          </div>
+        )}
+
+        {renderError && (
+          <div className="p-8 text-center text-rose-600">
+            <AlertTriangle className="w-6 h-6 mx-auto mb-1 text-rose-500" />
+            <span className="text-xs font-semibold">{renderError}</span>
+          </div>
+        )}
+
+        {/* The Native HTML5 Canvas (Eliminates Browser Plugin Blank Screen) */}
+        <canvas
+          ref={canvasRef}
+          className="max-w-full h-auto block pointer-events-none"
+        />
+
+        {/* Dynamic Translucent Diagonal Watermark Stamped over Canvas */}
+        <div className="absolute inset-0 pointer-events-none flex flex-col justify-around py-6 px-4 z-20 select-none overflow-hidden opacity-35">
+          {[0, 1, 2, 3, 4].map((row) => (
+            <div
+              key={row}
+              className="transform -rotate-25 whitespace-nowrap text-center text-[10px] sm:text-[11px] font-black tracking-widest text-[#65000D] uppercase font-mono select-none"
+            >
+              BCA STUDY POINT · {studentName} · 📱 {studentMobile} · ORDER: {orderId} · STRICTLY NO SCREENSHOT
+            </div>
+          ))}
+        </div>
+
+        {/* Anti-Pointer Layer */}
+        <div
+          className="absolute inset-0 z-30 bg-transparent"
+          onContextMenu={(e) => e.preventDefault()}
+        />
+      </div>
+
+      {/* Bottom Footer Info */}
+      <div className="bg-slate-100 border-t border-slate-200 px-4 py-1.5 flex items-center justify-between text-[10px] text-slate-500 font-mono">
+        <span>Licensed to: {studentName}</span>
+        <span>Order #{orderId}</span>
+      </div>
+    </div>
+  );
+};
 
 export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
   productId,
@@ -36,169 +210,93 @@ export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
 }) => {
   const { student, deviceInfo } = useAuth();
 
-  const [sessionToken, setSessionToken] = useState<string | null>(null);
-  const [manifest, setManifest] = useState<any | null>(null);
-  const [pages, setPages] = useState<PageState[]>([]);
-  const [isInitializing, setIsInitializing] = useState(true);
-  const [initError, setInitError] = useState<string | null>(null);
+  const [pdfDoc, setPdfDoc] = useState<any | null>(null);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [productInfo, setProductInfo] = useState<any | null>(null);
+  const [orderId, setOrderId] = useState<string>('ORD-VERIFIED');
+  const [currentPageInView, setCurrentPageInView] = useState<number>(1);
 
-  // Viewer UI Controls
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Viewer Controls
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isWindowBlurred, setIsWindowBlurred] = useState(false);
-  const [currentPageInView, setCurrentPageInView] = useState(1);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  // 1. Initialize Secure Viewer Session & Verify Device Binding
-  useEffect(() => {
-    let isMounted = true;
-
-    async function initSession() {
-      if (!student?.id) {
-        setInitError('Student account not authenticated.');
-        setIsInitializing(false);
-        return;
-      }
-
-      setIsInitializing(true);
-      setInitError(null);
-
-      try {
-        const sessionRes = await api.createViewerSession({
-          userId: student.id,
-          productId,
-          deviceToken: deviceInfo.token,
-          deviceInfo,
-        });
-
-        if (!isMounted) return;
-
-        if (!sessionRes.success) {
-          if (sessionRes.error === 'DEVICE_MISMATCH') {
-            onDeviceMismatch(sessionRes.registeredDevice, sessionRes.supportInfo);
-            onClose();
-            return;
-          }
-          throw new Error(sessionRes.message || sessionRes.error || 'Access denied');
-        }
-
-        const token = sessionRes.sessionToken!;
-        setSessionToken(token);
-
-        // Fetch document manifest
-        const manifestRes = await api.getViewerManifest(token);
-        if (!isMounted) return;
-
-        setManifest(manifestRes.manifest);
-
-        const pageCount = manifestRes.manifest.pageCount || 30;
-        const initialPages: PageState[] = Array.from({ length: pageCount }, (_, i) => ({
-          pageNumber: i + 1,
-          blobUrl: null,
-          loading: true,
-          error: null,
-        }));
-        setPages(initialPages);
-      } catch (err: any) {
-        if (!isMounted) return;
-        setInitError(err.message || 'Failed to authenticate secure session');
-      } finally {
-        if (isMounted) setIsInitializing(false);
-      }
+  // 1. Authenticate Session and Load Watermarked PDF Document Stream
+  const loadDocument = async () => {
+    if (!student?.id) {
+      setErrorMessage('Student account not authenticated.');
+      setIsLoading(false);
+      return;
     }
 
-    initSession();
+    setIsLoading(true);
+    setErrorMessage(null);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [productId, student?.id, deviceInfo.token]);
+    try {
+      // 1. Create secure viewer session
+      const sessionRes = await api.createViewerSession({
+        userId: student.id,
+        productId,
+        deviceToken: deviceInfo.token,
+        deviceInfo,
+      });
 
-  // 2. Fetch Page Blobs on Demand
-  const loadPageBlob = useCallback(
-    async (pageNumber: number) => {
-      if (!sessionToken) return;
-
-      try {
-        const pageUrl = api.getViewerPageUrl(sessionToken, pageNumber);
-        const res = await fetch(pageUrl);
-        if (!res.ok) {
-          if (res.status === 404) {
-            // Out of range: safely trim page list to valid pages
-            setPages((prev) => prev.filter((p) => p.pageNumber < pageNumber));
-            setManifest((prev: any) =>
-              prev ? { ...prev, pageCount: Math.min(prev.pageCount, pageNumber - 1) } : null
-            );
-            return;
-          }
-          throw new Error(`Failed to load page ${pageNumber}`);
+      if (!sessionRes.success) {
+        if (sessionRes.error === 'DEVICE_MISMATCH') {
+          onDeviceMismatch(sessionRes.registeredDevice, sessionRes.supportInfo);
+          onClose();
+          return;
         }
-        const blob = await res.blob();
-        const objectUrl = URL.createObjectURL(blob);
-
-        setPages((prev) =>
-          prev.map((p) =>
-            p.pageNumber === pageNumber
-              ? { ...p, blobUrl: objectUrl, loading: false, error: null }
-              : p
-          )
-        );
-      } catch (err: any) {
-        setPages((prev) =>
-          prev.map((p) =>
-            p.pageNumber === pageNumber
-              ? { ...p, loading: false, error: err.message || 'Page failed to render' }
-              : p
-          )
-        );
+        if (sessionRes.error === 'PENDING_APPROVAL') {
+          setErrorMessage(sessionRes.message || 'আপনার পেমেন্ট ভেরিফিকেশন চলছে। অ্যাডমিন অ্যাক্সেস দিলেই এই বিষয়ের প্রশ্নপত্র দেখতে পাবেন।');
+          setIsLoading(false);
+          return;
+        }
+        throw new Error(sessionRes.message || sessionRes.error || 'Access denied');
       }
-    },
-    [sessionToken]
-  );
 
-  // Load initial batch of pages
-  useEffect(() => {
-    if (!sessionToken || pages.length === 0) return;
+      const token = sessionRes.sessionToken!;
+      setProductInfo(sessionRes.product);
+      setOrderId(sessionRes.watermark?.orderId || 'ORD-VERIFIED');
 
-    pages.slice(0, 4).forEach((p) => {
-      if (p.loading && !p.blobUrl) {
-        loadPageBlob(p.pageNumber);
+      // 2. Fetch full watermarked PDF binary
+      const docUrl = api.getViewerDocumentUrl(token);
+      const res = await fetch(docUrl);
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => null);
+        throw new Error(errJson?.message || 'Failed to download secure question bank');
       }
-    });
-  }, [sessionToken, pages.length]);
 
-  // IntersectionObserver for lazy loading subsequent pages
+      const arrayBuffer = await res.arrayBuffer();
+
+      // 3. Load with PDF.js
+      const loadingTask = pdfjsLib.getDocument({
+        data: arrayBuffer,
+        cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
+        cMapPacked: true,
+      });
+
+      const loadedDoc = await loadingTask.promise;
+      setPdfDoc(loadedDoc);
+      setTotalPages(loadedDoc.numPages);
+    } catch (err: any) {
+      console.error('Document load error:', err);
+      setErrorMessage(err.message || 'Failed to open question bank. Please verify your purchase status.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    if (pages.length === 0) return;
+    loadDocument();
+  }, [productId, student?.id]);
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const pageIndex = Number(entry.target.getAttribute('data-page-index'));
-            if (!isNaN(pageIndex) && pages[pageIndex]) {
-              const targetPage = pages[pageIndex];
-              setCurrentPageInView(targetPage.pageNumber);
-              if (targetPage.loading && !targetPage.blobUrl) {
-                loadPageBlob(targetPage.pageNumber);
-              }
-            }
-          }
-        });
-      },
-      { root: containerRef.current, rootMargin: '300px 0px' }
-    );
-
-    pageRefs.current.forEach((el) => {
-      if (el) observer.observe(el);
-    });
-
-    return () => observer.disconnect();
-  }, [pages, loadPageBlob]);
-
-  // Security Event Handlers
+  // 2. Anti-Piracy Event Listeners
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault();
@@ -206,10 +304,12 @@ export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Block PrintScreen, DevTools, Save, Print, View Source
       if (
-        (e.ctrlKey && ['p', 's', 'c', 'u'].includes(e.key.toLowerCase())) ||
-        (e.metaKey && ['p', 's', 'c', 'u'].includes(e.key.toLowerCase())) ||
-        e.key === 'PrintScreen'
+        (e.ctrlKey && ['p', 's', 'c', 'u', 'i', 'j'].includes(e.key.toLowerCase())) ||
+        (e.metaKey && ['p', 's', 'c', 'u', 'i', 'j'].includes(e.key.toLowerCase())) ||
+        e.key === 'PrintScreen' ||
+        e.key === 'F12'
       ) {
         e.preventDefault();
         e.stopPropagation();
@@ -244,15 +344,6 @@ export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
     };
   }, []);
 
-  // Cleanup blob URLs on unmount
-  useEffect(() => {
-    return () => {
-      pages.forEach((p) => {
-        if (p.blobUrl) URL.revokeObjectURL(p.blobUrl);
-      });
-    };
-  }, [pages]);
-
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       containerRef.current?.requestFullscreen?.();
@@ -263,85 +354,66 @@ export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
     }
   };
 
-  const scrollToPage = (pageNum: number) => {
-    const targetEl = pageRefs.current[pageNum - 1];
-    if (targetEl && containerRef.current) {
-      targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
+  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#240005] flex flex-col protected-doc-zone select-none overflow-hidden">
-      {/* Privacy Shield when Tab/Window is unfocused */}
+    <div
+      ref={containerRef}
+      className="fixed inset-0 z-50 bg-[#240005] flex flex-col select-none overflow-hidden"
+    >
+      {/* Privacy Shield: Window focus lost / Screenshot tool active */}
       {isWindowBlurred && (
-        <div className="absolute inset-0 z-50 bg-[#3D0009]/95 backdrop-blur-2xl flex flex-col items-center justify-center p-6 text-center">
+        <div className="absolute inset-0 z-50 bg-[#3D0009]/95 backdrop-blur-3xl flex flex-col items-center justify-center p-6 text-center">
           <div className="w-16 h-16 rounded-3xl bg-[#65000D] border border-[#FFD34E]/60 flex items-center justify-center text-[#FFD34E] mb-4 shadow-[0_0_30px_rgba(255,211,78,0.4)]">
             <Lock className="w-8 h-8" />
           </div>
           <h2 className="text-2xl font-black text-white tracking-tight">
             Security Shield Active
           </h2>
-          <p className="mt-2 text-sm text-[#FFE7A3] max-w-md">
-            Document view has been temporarily obscured because window focus was lost. Return focus to this window to resume reading.
+          <p className="mt-2 text-xs sm:text-sm text-[#FFE7A3] max-w-md leading-relaxed">
+            স্ক্রিনশট বা অন্য উইন্ডো পরিবর্তনের কারণে কন্টেন্ট সাময়িকভাবে লুকানো হয়েছে। পড়তে পুনরায় এই উইন্ডোতে ক্লিক করুন।
           </p>
-          <span className="mt-4 text-xs font-mono text-white/50 tracking-wider">
-            {BRAND.name} · DRM SECURE READER
+          <span className="mt-4 text-[10px] font-mono text-white/50 tracking-wider">
+            {BRAND.name} · DRM CANVAS ANTI-PIRACY
           </span>
         </div>
       )}
 
-      {/* Top Liquid Glass Reader Toolbar */}
-      <div className="h-16 bg-[#3D0009]/90 border-b border-[#FFE7A3]/25 px-4 sm:px-6 flex items-center justify-between text-white shrink-0 z-20 backdrop-blur-xl shadow-lg">
-        {/* Left: Document Info with Logo */}
+      {/* Top Floating Glass Toolbar */}
+      <div className="h-16 bg-[#3D0009]/95 border-b border-[#FFE7A3]/25 px-4 sm:px-6 flex items-center justify-between text-white shrink-0 z-20 backdrop-blur-xl shadow-lg">
+        {/* Left: Branding & Subject Title */}
         <div className="flex items-center gap-3">
           <img
             src={BRAND.logoUrl}
             alt="Logo"
-            className="w-9 h-9 rounded-full object-cover ring-2 ring-[#FFD34E]/50"
+            className="w-9 h-9 rounded-full object-cover ring-2 ring-[#FFD34E]/50 shrink-0"
           />
-          <div className="hidden sm:block">
-            <h1 className="text-sm font-extrabold text-white truncate max-w-xs md:max-w-md">
-              {manifest?.subjectCode}: {manifest?.subjectName}
+          <div className="truncate max-w-[170px] sm:max-w-xs md:max-w-md text-left">
+            <h1 className="text-xs sm:text-sm font-extrabold text-white truncate">
+              {productInfo?.subjectCode ? `${productInfo.subjectCode}: ` : ''}
+              {productInfo?.subjectName || 'BCA Question Bank'}
             </h1>
-            <p className="text-[11px] text-[#FFE7A3]">
-              Licensed to: {student?.fullName} ({student?.email})
+            <p className="text-[10px] text-[#FFE7A3] truncate">
+              Student: {student?.fullName} ({student?.mobile || student?.email})
             </p>
           </div>
         </div>
 
-        {/* Center: Page Counter & Jump */}
-        {manifest && (
-          <div className="flex items-center gap-2 text-xs text-white font-semibold bg-black/40 px-3.5 py-1.5 rounded-full border border-[#FFE7A3]/30 backdrop-blur-md">
-            <span>Page</span>
+        {/* Center: Live Scroll Page Tracker */}
+        {pdfDoc && (
+          <div className="flex items-center gap-2 text-xs text-white font-semibold bg-black/50 px-3 py-1.5 rounded-full border border-[#FFE7A3]/30 backdrop-blur-md">
+            <Eye className="w-3.5 h-3.5 text-[#FFD34E]" />
+            <span className="hidden sm:inline">Page</span>
             <span className="font-extrabold text-[#FFD34E] tabular-nums">{currentPageInView}</span>
-            <span className="text-white/60">of</span>
-            <span className="tabular-nums">{manifest.pageCount}</span>
-
-            <div className="ml-2 flex items-center gap-0.5 border-l border-white/20 pl-2">
-              <button
-                onClick={() => scrollToPage(Math.max(1, currentPageInView - 1))}
-                disabled={currentPageInView <= 1}
-                className="p-1 hover:text-[#FFD34E] disabled:opacity-30 cursor-pointer"
-                title="Previous Page"
-              >
-                <ChevronUp className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={() => scrollToPage(Math.min(manifest.pageCount, currentPageInView + 1))}
-                disabled={currentPageInView >= manifest.pageCount}
-                className="p-1 hover:text-[#FFD34E] disabled:opacity-30 cursor-pointer"
-                title="Next Page"
-              >
-                <ChevronDown className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            <span className="text-white/60">/</span>
+            <span className="tabular-nums">{totalPages}</span>
           </div>
         )}
 
-        {/* Right: Zoom & Close */}
-        <div className="flex items-center gap-2">
+        {/* Right: Zoom & Close Controls */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
           {/* Zoom controls */}
-          <div className="hidden md:flex items-center gap-1 bg-black/40 px-2.5 py-1 rounded-full border border-[#FFE7A3]/30 text-xs">
+          <div className="flex items-center gap-1 bg-black/50 px-2 py-1 rounded-full border border-[#FFE7A3]/30 text-xs">
             <button
               onClick={() => setZoomLevel((z) => Math.max(70, z - 10))}
               className="p-1 text-white/70 hover:text-[#FFD34E] cursor-pointer"
@@ -349,7 +421,7 @@ export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
             >
               <ZoomOut className="w-3.5 h-3.5" />
             </button>
-            <span className="w-10 text-center font-mono tabular-nums text-[#FFE7A3]">
+            <span className="w-9 text-center font-mono tabular-nums text-[11px] text-[#FFE7A3]">
               {zoomLevel}%
             </span>
             <button
@@ -363,7 +435,7 @@ export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
 
           <button
             onClick={toggleFullscreen}
-            className="hidden sm:p-2 text-white/70 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+            className="hidden sm:inline-flex p-2 text-white/70 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
             title="Toggle Fullscreen"
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -379,109 +451,67 @@ export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
         </div>
       </div>
 
-      {/* Main Continuous Scroll Area */}
-      <div
-        ref={containerRef}
-        className="flex-1 overflow-y-auto bg-gradient-to-b from-[#240005] via-[#3D0009] to-[#240005] p-4 sm:p-6 flex flex-col items-center space-y-6 scroll-smooth"
-      >
-        {isInitializing ? (
+      {/* Main Single-Stream Continuous Scroll View */}
+      <div className="flex-1 overflow-y-auto bg-gradient-to-b from-[#240005] via-[#3D0009] to-[#240005] p-3 sm:p-6 flex flex-col items-center scroll-smooth">
+        {isLoading ? (
           <div className="flex flex-col items-center justify-center my-auto py-24 text-center">
             <Loader2 className="w-12 h-12 animate-spin text-[#FFD34E] mb-3" />
             <h3 className="text-base font-extrabold text-white">
-              Authenticating Device &amp; Rendering Pages...
+              Loading All Question Bank Pages...
             </h3>
-            <p className="text-xs text-[#FFE7A3] mt-1">
-              Verifying licensed student identity and applying dynamic watermarks.
+            <p className="text-xs text-[#FFE7A3] mt-1 max-w-sm">
+              Applying dynamic student watermarks and preparing high-definition continuous canvas stream.
             </p>
           </div>
-        ) : initError ? (
-          <div className="max-w-md my-auto bg-black/40 border border-rose-500/40 rounded-3xl p-6 text-center text-white backdrop-blur-xl">
-            <AlertTriangle className="w-10 h-10 text-rose-400 mx-auto mb-3" />
-            <h3 className="text-base font-bold text-white">Viewer Authentication Failed</h3>
-            <p className="text-xs text-white/80 mt-2 leading-relaxed">{initError}</p>
-            <button
-              onClick={onClose}
-              className="mt-5 btn-gold-primary px-5 py-2 text-xs font-bold rounded-full"
-            >
-              Back to Catalog
-            </button>
+        ) : errorMessage ? (
+          <div className="max-w-md my-auto bg-black/60 border border-amber-400/50 rounded-3xl p-6 text-center text-white backdrop-blur-xl space-y-3">
+            <div className="w-12 h-12 rounded-full bg-amber-500/20 border border-amber-400 flex items-center justify-center mx-auto text-amber-300">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-bold text-white">অ্যাক্সেস পেন্ডিং বা অনুপলব্ধ</h3>
+            <p className="text-xs text-white/90 leading-relaxed">{errorMessage}</p>
+
+            <div className="pt-2 flex flex-col gap-2">
+              <button
+                onClick={loadDocument}
+                className="btn-gold-primary py-2 px-5 text-xs font-bold rounded-full flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>পুনরায় চেষ্টা করুন (Retry)</span>
+              </button>
+              <button
+                onClick={onClose}
+                className="py-2 px-4 text-xs font-bold text-white/70 hover:text-white cursor-pointer"
+              >
+                Close Viewer
+              </button>
+            </div>
           </div>
-        ) : (
-          pages.map((page, idx) => (
-            <div
-              key={page.pageNumber}
-              ref={(el) => {
-                pageRefs.current[idx] = el;
-              }}
-              data-page-index={idx}
-              style={{ width: `${Math.min(900, (800 * zoomLevel) / 100)}px` }}
-              className="relative bg-white rounded-xl shadow-[0_20px_60px_rgba(0,0,0,0.7)] border border-slate-300 overflow-hidden min-h-[500px] flex flex-col transition-all duration-150"
-            >
-              {/* Forensic Dynamic Watermark Overlay (dense diagonal 25deg) */}
-              <div className="absolute inset-0 z-20 pointer-events-none overflow-hidden flex flex-col justify-around py-8 px-4 opacity-40 select-none">
-                {[0, 1, 2, 3, 4, 5].map((row) => (
-                  <div
-                    key={row}
-                    className="transform -rotate-25 whitespace-nowrap text-center text-[10px] sm:text-[11px] font-black tracking-widest text-red-950/60 uppercase font-mono select-none"
-                  >
-                    BCA STUDY POINT · {student?.fullName} · PH: {student?.mobile || student?.email} · TOKEN: {deviceInfo?.token?.slice(0, 10)} · NO SCREENSHOT
-                  </div>
-                ))}
-              </div>
-
-              {/* Transparent Shield over the embedded page */}
-              <div
-                className="absolute inset-0 z-10 bg-transparent"
-                onContextMenu={(e) => e.preventDefault()}
+        ) : pdfDoc ? (
+          <div className="w-full max-w-4xl flex flex-col items-center">
+            {/* Continuous stream of all pages stacked vertically */}
+            {pageNumbers.map((pageNum) => (
+              <SinglePageCanvas
+                key={pageNum}
+                pdfDoc={pdfDoc}
+                pageNumber={pageNum}
+                zoomLevel={zoomLevel}
+                studentName={student?.fullName || 'Student'}
+                studentMobile={student?.mobile || student?.email || ''}
+                orderId={orderId}
+                onInView={(inViewPage) => setCurrentPageInView(inViewPage)}
               />
+            ))}
 
-              {/* Page Content */}
-              {page.loading ? (
-                <div className="h-[600px] flex flex-col items-center justify-center bg-slate-100 text-slate-500">
-                  <Loader2 className="w-8 h-8 animate-spin text-[#970014] mb-2" />
-                  <span className="text-xs font-bold text-slate-700">
-                    Loading Page {page.pageNumber}...
-                  </span>
-                </div>
-              ) : page.error ? (
-                <div className="h-[400px] flex flex-col items-center justify-center bg-rose-50 text-rose-700 p-6 text-center">
-                  <AlertTriangle className="w-8 h-8 mb-2" />
-                  <span className="text-xs font-semibold">{page.error}</span>
-                  <button
-                    onClick={() => loadPageBlob(page.pageNumber)}
-                    className="mt-3 px-3 py-1 bg-white border border-rose-200 rounded text-xs hover:bg-rose-100 cursor-pointer"
-                  >
-                    Retry Page
-                  </button>
-                </div>
-              ) : page.blobUrl ? (
-                <div className="w-full flex-1 min-h-[750px] bg-slate-50 flex flex-col">
-                  <object
-                    data={`${page.blobUrl}#toolbar=0&navpanes=0&scrollbar=0`}
-                    type="application/pdf"
-                    className="w-full flex-1 h-[820px] pointer-events-none"
-                  >
-                    <iframe
-                      src={`${page.blobUrl}#toolbar=0&navpanes=0&scrollbar=0`}
-                      className="w-full h-[820px] border-none pointer-events-none"
-                      title={`Page ${page.pageNumber}`}
-                    />
-                  </object>
-                </div>
-              ) : null}
-
-              {/* Bottom Page Tag */}
-              <div className="bg-slate-100 border-t border-slate-200 px-4 py-1.5 flex items-center justify-between text-[11px] text-slate-600 font-mono">
-                <span>
-                  Page {page.pageNumber} / {manifest?.pageCount}
-                </span>
-                <span className="hidden sm:inline">
-                  DRM Watermarked · {student?.email}
-                </span>
+            {/* End of Document Banner */}
+            <div className="my-8 text-center text-xs text-[#FFE7A3]/70 font-mono space-y-1">
+              <div>✓ End of Solved Question Bank ({totalPages} of {totalPages} Pages)</div>
+              <div className="text-[10px] text-white/40">
+                BCA STUDY POINT · EXAM PREPARATION PARTNER
               </div>
             </div>
-          ))
-        )}
+          </div>
+        ) : null}
       </div>
     </div>
   );

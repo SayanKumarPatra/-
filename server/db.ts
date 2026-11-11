@@ -492,6 +492,16 @@ class Database {
     );
   }
 
+  getStudentByEmailOrMobile(identifier: string): Student | undefined {
+    const clean = identifier.trim().toLowerCase();
+    const cleanDigits = clean.replace(/\D/g, '');
+    return this.data.students.find((s) => {
+      const emailMatch = s.email.toLowerCase().trim() === clean;
+      const mobileMatch = cleanDigits.length >= 10 && s.mobile.replace(/\D/g, '') === cleanDigits;
+      return emailMatch || mobileMatch;
+    });
+  }
+
   upsertStudent(studentData: {
     email: string;
     fullName: string;
@@ -501,6 +511,10 @@ class Database {
     ip?: string;
   }): Student {
     let student = this.getStudentByEmail(studentData.email);
+    if (!student && studentData.mobile) {
+      student = this.getStudentByEmailOrMobile(studentData.mobile);
+    }
+
     if (student) {
       student.fullName = studentData.fullName || student.fullName;
       student.mobile = studentData.mobile || student.mobile;
@@ -560,6 +574,72 @@ class Database {
     return this.data.orders[idx];
   }
 
+  approveOrder(orderId: string, adminId: string = 'admin'): { success: boolean; order?: Order; error?: string } {
+    const order = this.getOrder(orderId);
+    if (!order) return { success: false, error: 'Order not found' };
+
+    order.paymentStatus = 'verified';
+    order.verifiedAt = new Date().toISOString();
+
+    // Activate all purchases linked to this order or student
+    for (const prodId of order.selectedProductIds) {
+      const existing = this.data.purchases.find(
+        (p) => p.userId === order.userId && p.productId === prodId
+      );
+      if (existing) {
+        existing.accessStatus = 'active';
+        existing.orderId = order.orderId;
+      } else {
+        this.data.purchases.push({
+          purchaseId: `pur-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          userId: order.userId,
+          productId: prodId,
+          orderId: order.orderId,
+          accessStatus: 'active',
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    this.logAdminAction({
+      adminId,
+      action: 'APPROVE_ORDER',
+      targetId: orderId,
+      targetType: 'ORDER',
+      details: `Approved payment for order ${orderId} (${order.studentName}, ₹${order.totalAmount}). Full PDF access granted for ${order.selectedProductIds.length} subjects.`,
+    });
+
+    this.persist();
+    return { success: true, order };
+  }
+
+  rejectOrder(orderId: string, adminId: string = 'admin', reason?: string): { success: boolean; order?: Order; error?: string } {
+    const order = this.getOrder(orderId);
+    if (!order) return { success: false, error: 'Order not found' };
+
+    order.paymentStatus = 'rejected';
+
+    for (const prodId of order.selectedProductIds) {
+      const purchase = this.data.purchases.find(
+        (p) => p.userId === order.userId && p.productId === prodId && p.orderId === orderId
+      );
+      if (purchase) {
+        purchase.accessStatus = 'revoked';
+      }
+    }
+
+    this.logAdminAction({
+      adminId,
+      action: 'REJECT_ORDER',
+      targetId: orderId,
+      targetType: 'ORDER',
+      details: `Rejected order ${orderId} (${order.studentName}). Reason: ${reason || 'Payment verification failed'}`,
+    });
+
+    this.persist();
+    return { success: true, order };
+  }
+
   // --- PURCHASES ---
   getPurchases(): Purchase[] {
     return this.data.purchases;
@@ -567,7 +647,7 @@ class Database {
 
   getStudentPurchases(userId: string): Purchase[] {
     return this.data.purchases.filter(
-      (p) => p.userId === userId && p.accessStatus === 'active'
+      (p) => p.userId === userId && (p.accessStatus === 'active' || p.accessStatus === 'pending_approval')
     );
   }
 
@@ -577,14 +657,27 @@ class Database {
     );
   }
 
-  grantPurchases(userId: string, orderId: string, productIds: string[]): Purchase[] {
+  getPurchaseStatus(userId: string, productId: string): 'active' | 'pending_approval' | 'revoked' | 'unpurchased' {
+    const p = this.data.purchases.find(
+      (pur) => pur.userId === userId && pur.productId === productId
+    );
+    if (!p) return 'unpurchased';
+    return p.accessStatus;
+  }
+
+  grantPurchases(
+    userId: string,
+    orderId: string,
+    productIds: string[],
+    status: 'active' | 'pending_approval' = 'active'
+  ): Purchase[] {
     const created: Purchase[] = [];
     for (const prodId of productIds) {
       const exists = this.data.purchases.find(
         (p) => p.userId === userId && p.productId === prodId
       );
       if (exists) {
-        exists.accessStatus = 'active';
+        exists.accessStatus = status;
         exists.orderId = orderId;
         created.push(exists);
       } else {
@@ -593,7 +686,7 @@ class Database {
           userId,
           productId: prodId,
           orderId,
-          accessStatus: 'active',
+          accessStatus: status,
           createdAt: new Date().toISOString(),
         };
         this.data.purchases.push(purchase);

@@ -163,6 +163,38 @@ export const api = {
     return data;
   },
 
+  // --- Student Authentication ---
+  async studentRegister(payload: {
+    fullName: string;
+    email: string;
+    mobile: string;
+    collegeName?: string;
+  }): Promise<{ success: boolean; student: any; error?: string; message?: string }> {
+    const res = await fetch('/api/auth/student-register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || data.error || 'Registration failed');
+    }
+    return data;
+  },
+
+  async studentLogin(identifier: string): Promise<{ success: boolean; student: any; error?: string; message?: string }> {
+    const res = await fetch('/api/auth/student-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || data.error || 'Student account not found');
+    }
+    return data;
+  },
+
   async getViewerManifest(sessionToken: string) {
     const res = await fetch(`/api/viewer/manifest?token=${encodeURIComponent(sessionToken)}`);
     if (!res.ok) throw new Error('Session expired or document unavailable');
@@ -171,6 +203,10 @@ export const api = {
 
   getViewerPageUrl(sessionToken: string, pageNumber: number): string {
     return `/api/viewer/page?token=${encodeURIComponent(sessionToken)}&pageNumber=${pageNumber}`;
+  },
+
+  getViewerDocumentUrl(sessionToken: string): string {
+    return `/api/viewer/document?token=${encodeURIComponent(sessionToken)}`;
   },
 
   // --- Admin API ---
@@ -297,6 +333,35 @@ export const api = {
     });
     if (!res.ok) throw new Error('Failed to fetch orders');
     return res.json();
+  },
+
+  async approveOrder(orderId: string): Promise<{ success: boolean; message: string; order: Order }> {
+    const adminKey = getStoredAdminKey();
+    const res = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/approve`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-key': adminKey || '',
+      },
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || 'Failed to approve order');
+    return data;
+  },
+
+  async rejectOrder(orderId: string, reason?: string): Promise<{ success: boolean; message: string; order: Order }> {
+    const adminKey = getStoredAdminKey();
+    const res = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/reject`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-key': adminKey || '',
+      },
+      body: JSON.stringify({ reason }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || 'Failed to reject order');
+    return data;
   },
 
   async getAdminDevices(): Promise<{ devices: DeviceBinding[] }> {
