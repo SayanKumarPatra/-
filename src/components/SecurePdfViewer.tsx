@@ -17,6 +17,8 @@ import * as pdfjsLib from 'pdfjs-dist';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { BRAND } from '../constants/brand';
+import { getProductPdfUrl } from '../constants/productPdfs';
+import { FALLBACK_PRODUCTS } from '../constants/fallbackProducts';
 
 // Configure PDF.js Worker to guarantee zero-fail rendering across all browsers
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';

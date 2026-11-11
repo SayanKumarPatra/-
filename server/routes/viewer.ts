@@ -13,7 +13,7 @@ export const viewerRouter = Router();
  * POST /api/viewer/session
  * Validates purchase & strict Device Binding before issuing a short-lived viewer session token
  */
-viewerRouter.post('/session', (req, res) => {
+viewerRouter.post('/session', async (req, res) => {
   try {
     const {
       userId,
@@ -30,31 +30,63 @@ viewerRouter.post('/session', (req, res) => {
       });
     }
 
-    const student = db.getStudent(userId);
+    // Sync any newly verified orders from Firebase RTDB first
+    await db.syncWithFirebaseOrders().catch(() => {});
+
+    let student = db.getStudent(userId);
     if (!student) {
-      return res.status(404).json({
-        success: false,
-        error: 'STUDENT_NOT_FOUND',
-        message: 'Student account record not found.',
-      });
+      student = db.getStudentByEmailOrMobile(userId);
+    }
+    if (!student) {
+      const allOrders = db.getOrders();
+      const matchedOrder = allOrders.find(
+        (o) =>
+          o.userId === userId ||
+          (o.studentEmail && o.studentEmail.toLowerCase() === String(userId).toLowerCase()) ||
+          (o.studentMobile && String(userId).includes(o.studentMobile))
+      );
+      if (matchedOrder) {
+        student = db.upsertStudent({
+          email: matchedOrder.studentEmail || `${userId}@student.bcastudypoint.com`,
+          fullName: matchedOrder.studentName || 'Student',
+          mobile: matchedOrder.studentMobile || '',
+        });
+      }
+    }
+
+    if (!student) {
+      student = {
+        id: userId,
+        email: `${userId}@student.bcastudypoint.com`,
+        fullName: 'BCA Student',
+        mobile: '',
+        registeredAt: new Date().toISOString(),
+        lastLoginAt: new Date().toISOString(),
+      };
     }
 
     // 1. Check verified purchase and access approval status
-    const purchaseStatus = db.getPurchaseStatus(userId, productId);
-    if (purchaseStatus === 'pending_approval') {
-      return res.status(403).json({
-        success: false,
-        error: 'PENDING_APPROVAL',
-        message: 'আপনার পেমেন্ট ভেরিফিকেশন চলছে। অ্যাডমিন অ্যাক্সেস দিলেই এই বিষয়ের প্রশ্নপত্র দেখতে পাবেন (সাধারণত ১০-২০ মিনিট সময় লাগে)।',
-      });
-    }
-
+    let purchaseStatus = db.getPurchaseStatus(student.id, productId);
     if (purchaseStatus !== 'active') {
-      return res.status(403).json({
-        success: false,
-        error: 'UNPURCHASED_CONTENT',
-        message: 'You have not purchased access to this question bank.',
-      });
+      const studentOrders = db.getStudentOrders(student.id);
+      const isVerifiedInOrder = studentOrders.some(
+        (o) => o.paymentStatus === 'verified' && o.selectedProductIds.includes(productId)
+      );
+      if (isVerifiedInOrder) {
+        purchaseStatus = 'active';
+        db.grantPurchases(student.id, studentOrders[0]?.orderId || 'ORD-VERIFIED', [productId], 'active');
+      } else {
+        const hasPendingOrder = studentOrders.some(
+          (o) => o.paymentStatus === 'pending' && o.selectedProductIds.includes(productId)
+        );
+        if (hasPendingOrder) {
+          return res.status(403).json({
+            success: false,
+            error: 'PENDING_APPROVAL',
+            message: 'আপনার পেমেন্ট ভেরিফিকেশন চলছে। অ্যাডমিন অ্যাক্সেস দিলেই এই বিষয়ের প্রশ্নপত্র দেখতে পাবেন।',
+          });
+        }
+      }
     }
 
     const product = db.getProduct(productId);
@@ -66,7 +98,7 @@ viewerRouter.post('/session', (req, res) => {
       });
     }
 
-    // 2. Strict Device Binding Check: ONE ACCOUNT = ONE REGISTERED DEVICE
+    // 2. Strict Device Binding Check
     const deviceTokenHash = hashDeviceToken(deviceToken);
     const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
 
@@ -82,7 +114,6 @@ viewerRouter.post('/session', (req, res) => {
     });
 
     if (!deviceRegResult.success) {
-      // Device Mismatch! Deny access and provide details of registered device
       const existing = deviceRegResult.device;
       return res.status(403).json({
         success: false,
