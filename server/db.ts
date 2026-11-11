@@ -943,6 +943,8 @@ class Database {
     // Invalidate any active viewer sessions for this user
     this.data.viewerSessions = this.data.viewerSessions.filter((s) => s.userId !== userId);
 
+    firebaseSync.clearActiveDevice(userId).catch(() => {});
+
     this.logAdminAction({
       adminId,
       action: 'DEVICE_RESET',
@@ -959,6 +961,7 @@ class Database {
     const initialLen = this.data.devices.length;
     this.data.devices = this.data.devices.filter((d) => d.userId !== userId);
     this.data.viewerSessions = this.data.viewerSessions.filter((s) => s.userId !== userId);
+    firebaseSync.clearActiveDevice(userId).catch(() => {});
     this.persist();
     this.logAdminAction({
       adminId,
@@ -968,6 +971,88 @@ class Database {
       details: `Permanently removed device binding for student ${userId}`,
     });
     return this.data.devices.length < initialLen;
+  }
+
+  releaseStudentDevice(userId: string): boolean {
+    const devices = this.data.devices.filter(
+      (d) => d.userId === userId && d.registrationStatus === 'active'
+    );
+    for (const d of devices) {
+      d.registrationStatus = 'logged_out';
+      d.lastSeenAt = new Date().toISOString();
+    }
+    this.data.viewerSessions = this.data.viewerSessions.filter((s) => s.userId !== userId);
+    this.persist();
+    firebaseSync.clearActiveDevice(userId).catch(() => {});
+    return true;
+  }
+
+  checkAndBindStudentDevice(deviceData: {
+    userId: string;
+    userEmail: string;
+    studentName: string;
+    deviceToken: string;
+    deviceDescription?: string;
+    os?: string;
+    browser?: string;
+    ip?: string;
+  }): { success: boolean; device?: DeviceBinding; error?: string; message?: string; activeDevice?: any } {
+    const clientIp = deviceData.ip || '127.0.0.1';
+    const tokenHash = crypto.createHash('sha256').update(deviceData.deviceToken).digest('hex');
+
+    // Look for currently active device for this user
+    const existing = this.data.devices.find(
+      (d) => d.userId === deviceData.userId && d.registrationStatus === 'active'
+    );
+
+    if (existing) {
+      // If it's the exact same registered device (same browser token)
+      if (existing.deviceTokenHash === tokenHash) {
+        existing.lastSeenAt = new Date().toISOString();
+        existing.lastIp = clientIp;
+        if (deviceData.os) existing.os = deviceData.os;
+        if (deviceData.browser) existing.browser = deviceData.browser;
+        this.persist();
+        firebaseSync.syncActiveDevice(deviceData.userId, existing).catch(() => {});
+        return { success: true, device: existing };
+      }
+
+      // If a DIFFERENT device is already logged in and active
+      return {
+        success: false,
+        error: 'DEVICE_ALREADY_ACTIVE',
+        message: 'আপনার অ্যাকাউন্টটি ইতিমধ্যে অন্য একটি ডিভাইসে সক্রিয় রয়েছে (বর্তমানে লগইন আছে)। একটি অ্যাকাউন্টে একসাথে কেবল ১টি ডিভাইসে লগইন রাখা অনুমোদিত। অনুগ্রহ করে আপনার পূর্বের ডিভাইস থেকে লগআউট করুন, অথবা কলেজ অ্যাডমিনের সহায়তা নিন।',
+        activeDevice: {
+          deviceDescription: existing.deviceDescription,
+          os: existing.os,
+          browser: existing.browser,
+          lastSeenAt: existing.lastSeenAt,
+          registeredAt: existing.registeredAt,
+        },
+      };
+    }
+
+    // No active device currently bound -> bind this device as active
+    const newDevice: DeviceBinding = {
+      id: `dev-${Date.now()}`,
+      userId: deviceData.userId,
+      userEmail: deviceData.userEmail,
+      studentName: deviceData.studentName,
+      deviceTokenHash: tokenHash,
+      deviceDescription: deviceData.deviceDescription || `${deviceData.os || 'Device'} · ${deviceData.browser || 'Browser'}`,
+      os: deviceData.os || 'Unknown OS',
+      browser: deviceData.browser || 'Browser',
+      registeredAt: new Date().toISOString(),
+      lastSeenAt: new Date().toISOString(),
+      lastIp: clientIp,
+      registrationStatus: 'active',
+      resetCount: 0,
+    };
+
+    this.data.devices.push(newDevice);
+    this.persist();
+    firebaseSync.syncActiveDevice(deviceData.userId, newDevice).catch(() => {});
+    return { success: true, device: newDevice };
   }
 
   // --- VIEWER SESSIONS ---

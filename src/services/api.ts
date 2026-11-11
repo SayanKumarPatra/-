@@ -41,7 +41,11 @@ async function safeFetchJson<T = any>(
 
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data.message || data.error || `Request failed with status ${res.status}`);
+      const err: any = new Error(data.message || data.error || `Request failed with status ${res.status}`);
+      err.activeDevice = data.activeDevice;
+      err.errorCode = data.error;
+      err.status = res.status;
+      throw err;
     }
     return data as T;
   } catch (err: any) {
@@ -186,36 +190,50 @@ export const api = {
     email: string;
     mobile: string;
     collegeName?: string;
+    deviceInfo?: any;
   }): Promise<{ success: boolean; student: any; error?: string; message?: string }> {
-    try {
-      return await safeFetchJson('/api/auth/student-register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-    } catch (err: any) {
-      if (payload.fullName && payload.mobile && payload.mobile.length >= 10) {
-        const student = {
-          id: `std-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          fullName: payload.fullName.trim(),
-          email: payload.email.trim() || `${payload.mobile}@student.bcastudypoint.com`,
-          mobile: payload.mobile.trim(),
-          collegeName: payload.collegeName?.trim(),
-          registeredAt: new Date().toISOString(),
-          lastLoginAt: new Date().toISOString(),
-        };
-        return { success: true, student };
-      }
-      throw err;
-    }
+    return safeFetchJson('/api/auth/student-register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
   },
 
-  async studentLogin(identifier: string): Promise<{ success: boolean; student: any; error?: string; message?: string }> {
+  async studentLogin(
+    identifier: string,
+    deviceInfo?: any
+  ): Promise<{ success: boolean; student: any; error?: string; message?: string; activeDevice?: any }> {
     return safeFetchJson('/api/auth/student-login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier: identifier.trim() }),
+      body: JSON.stringify({ identifier: identifier.trim(), deviceInfo }),
     });
+  },
+
+  async googleLogin(payload: {
+    email: string;
+    fullName: string;
+    googleUid?: string;
+    photoUrl?: string;
+    deviceInfo?: any;
+  }): Promise<{ success: boolean; student: any; error?: string; message?: string; activeDevice?: any }> {
+    return safeFetchJson('/api/auth/google-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async studentLogout(studentId: string): Promise<{ success: boolean }> {
+    try {
+      return await safeFetchJson('/api/auth/student-logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId }),
+      });
+    } catch {
+      return { success: true };
+    }
   },
 
   // --- Secure PDF Viewer ---

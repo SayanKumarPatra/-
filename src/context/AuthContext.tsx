@@ -1,7 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { getOrCreateDeviceToken, type DeviceInfo } from '../services/deviceFingerprint';
 import type { Student } from '../types';
-import { auth, syncStudentProfileRealtime, subscribeToStudentProfile } from '../firebase/firebase';
+import {
+  auth,
+  syncStudentProfileRealtime,
+  syncActiveDeviceRealtime,
+  releaseActiveDeviceRealtime,
+} from '../firebase/firebase';
+import { api } from '../services/api';
 import { onAuthStateChanged } from 'firebase/auth';
 
 interface AuthContextType {
@@ -36,21 +42,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Listen to Firebase Auth state
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
-        // If logged in via Firebase Auth, ensure student profile is active
+        // Only enrich student if an authorized session is active in local storage
+        const stored = localStorage.getItem(STUDENT_STORAGE_KEY);
+        if (!stored) return;
+
         setStudent((prev) => {
-          if (prev && prev.id === firebaseUser.uid) return prev;
+          if (!prev) return null;
+          if (prev.id === firebaseUser.uid && prev.email === (firebaseUser.email || prev.email)) return prev;
           const userStudent: Student = {
-            id: firebaseUser.uid,
-            email: firebaseUser.email || '',
-            fullName: firebaseUser.displayName || prev?.fullName || 'BCA Scholar',
-            mobile: prev?.mobile || '',
-            collegeName: prev?.collegeName,
-            studentId: prev?.studentId,
-            registeredAt: prev?.registeredAt || new Date().toISOString(),
+            ...prev,
+            id: firebaseUser.uid || prev.id,
+            email: firebaseUser.email || prev.email,
+            fullName: firebaseUser.displayName || prev.fullName,
             lastLoginAt: new Date().toISOString(),
           };
           localStorage.setItem(STUDENT_STORAGE_KEY, JSON.stringify(userStudent));
-          // Real-time sync to Firestore
+          // Real-time sync to Firestore / RTDB
           syncStudentProfileRealtime(userStudent);
           return userStudent;
         });
@@ -76,16 +83,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setStudent(updated);
     localStorage.setItem(STUDENT_STORAGE_KEY, JSON.stringify(updated));
 
-    // Real-time sync to Firebase Firestore
+    // Real-time sync to Firebase Realtime Database
     syncStudentProfileRealtime(updated).catch((err) => {
       console.warn('Realtime Firebase sync note:', err);
     });
+
+    // Real-time active device registration
+    syncActiveDeviceRealtime(updated.id, {
+      token: deviceInfo.token,
+      os: deviceInfo.os,
+      browser: deviceInfo.browser,
+      userAgent: deviceInfo.userAgent,
+    }).catch(() => {});
   };
 
   const logout = () => {
+    const studentToLogout = student;
     setStudent(null);
     localStorage.removeItem(STUDENT_STORAGE_KEY);
     auth.signOut().catch(() => {});
+
+    if (studentToLogout?.id) {
+      // Release server-side and realtime active device session so another device can log in!
+      api.studentLogout(studentToLogout.id).catch(() => {});
+      releaseActiveDeviceRealtime(studentToLogout.id).catch(() => {});
+    }
   };
 
   const refreshDevice = () => {

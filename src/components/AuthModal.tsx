@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Lock, Mail, Phone, User, ArrowLeft } from 'lucide-react';
+import { X, Lock, Mail, Phone, User, ArrowLeft, ShieldAlert, Smartphone, Clock, Globe, Copy, Check, ExternalLink } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { BRAND } from '../constants/brand';
 
@@ -22,33 +22,47 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onSuccess,
   isPage = false,
 }) => {
-  const { loginStudent } = useAuth();
+  const { loginStudent, deviceInfo } = useAuth();
   const [isRegister, setIsRegister] = useState(defaultIsRegister);
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [mobile, setMobile] = useState('');
   const [collegeName, setCollegeName] = useState('');
   const [error, setError] = useState('');
+  const [blockedActiveDevice, setBlockedActiveDevice] = useState<any>(null);
+  const [unauthorizedDomain, setUnauthorizedDomain] = useState<string | null>(null);
+  const [copiedDomain, setCopiedDomain] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   if (!isOpen) return null;
 
   const handleGoogleSignIn = async () => {
     setError('');
+    setBlockedActiveDevice(null);
+    setUnauthorizedDomain(null);
     setIsLoading(true);
     try {
       const res = await signInWithPopup(auth, googleProvider);
       if (res.user) {
-        // Register or retrieve user in server db
         const cleanMobile = res.user.phoneNumber?.replace(/\D/g, '') || '';
         const userEmail = res.user.email || `${res.user.uid}@student.bcastudypoint.com`;
         const userName = res.user.displayName || userEmail.split('@')[0] || 'BCA Student';
 
-        loginStudent({
-          id: res.user.uid,
+        // Verify and bind on server with 1-device policy
+        const loginRes = await api.googleLogin({
           email: userEmail,
           fullName: userName,
-          mobile: cleanMobile,
+          googleUid: res.user.uid,
+          photoUrl: res.user.photoURL || undefined,
+          deviceInfo,
+        });
+
+        loginStudent({
+          id: loginRes.student.id,
+          email: loginRes.student.email,
+          fullName: loginRes.student.fullName,
+          mobile: loginRes.student.mobile || cleanMobile,
+          collegeName: loginRes.student.collegeName,
         });
 
         if (onSuccess) onSuccess();
@@ -56,12 +70,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
     } catch (err: any) {
       console.warn('Google sign in note:', err);
-      if (err.code === 'auth/unauthorized-domain' || err.message?.includes('unauthorized-domain')) {
-        setError('Google Sign-in ডোমেইন ফায়ারবেসে কনফিগার করা নেই। আপনি সরাসরি নীচের মোবাইল নম্বর বা ইমেইল দিয়ে রেজিস্টার করতে পারেন।');
+      // If server rejected because another device is actively logged in
+      if (err.errorCode === 'DEVICE_ALREADY_ACTIVE' || err.activeDevice) {
+        await auth.signOut().catch(() => {});
+        setBlockedActiveDevice(err.activeDevice || true);
+        setError(err.message || 'আপনার অ্যাকাউন্টটি ইতিমধ্যে অন্য একটি ডিভাইসে সক্রিয় রয়েছে।');
+      } else if (err.code === 'auth/unauthorized-domain' || err.message?.includes('unauthorized-domain')) {
+        const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'bcastudypoint.vercel.app';
+        setUnauthorizedDomain(currentHost);
+        setError(`Google Sign-in চালু করতে Firebase Console-এ ডোমেইনটি যুক্ত করতে হবে।`);
       } else if (err.code === 'auth/popup-closed-by-user') {
-        setError('Google Sign-In বাতিল হয়েছে। প্রয়োজনে নীচের ফর্মের সাহায্যে রেজিস্টার করুন।');
+        setError('Google Sign-In বাতিল হয়েছে। প্রয়োজনে নীচের ফর্মের সাহায্যে লগইন করুন।');
       } else {
-        setError(err.message || 'Google Sign-in সম্পন্ন করা যায়নি। আপনি নাম ও মোবাইল দিয়ে রেজিস্টার করতে পারেন।');
+        setError(err.message || 'Google Sign-in সম্পন্ন করা যায়নি। আপনি নাম ও মোবাইল দিয়ে লগইন করতে পারেন।');
       }
     } finally {
       setIsLoading(false);
@@ -71,6 +92,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setBlockedActiveDevice(null);
 
     const cleanMobile = mobile.replace(/\D/g, '');
 
@@ -94,6 +116,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           email: effectiveEmail,
           mobile: cleanMobile,
           collegeName: collegeName.trim() || undefined,
+          deviceInfo,
         });
 
         loginStudent({
@@ -112,7 +135,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setIsLoading(false);
       }
     } else {
-      // SIGN IN MODE: Must verify existing registered student
+      // SIGN IN MODE: Verify existing registered student & enforce single device
       const identifier = email.trim();
       if (!identifier) {
         setError('দয়া করে আপনার রেজিস্টার্ড ইমেইল বা ১০ সংখ্যার মোবাইল নম্বর লিখুন।');
@@ -121,7 +144,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
       setIsLoading(true);
       try {
-        const loginRes = await api.studentLogin(identifier);
+        const loginRes = await api.studentLogin(identifier, deviceInfo);
 
         loginStudent({
           id: loginRes.student.id,
@@ -134,7 +157,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         if (onSuccess) onSuccess();
         onClose();
       } catch (err: any) {
-        setError(err.message || 'এই ইমেইল বা মোবাইল নম্বরে কোনো অ্যাকাউন্ট পাওয়া যায়নি। দয়া করে প্রথমে "Register" করুন।');
+        if (err.errorCode === 'DEVICE_ALREADY_ACTIVE' || err.activeDevice) {
+          setBlockedActiveDevice(err.activeDevice || true);
+          setError(err.message || 'আপনার অ্যাকাউন্টটি ইতিমধ্যে অন্য একটি ডিভাইসে সক্রিয় রয়েছে।');
+        } else {
+          setError(err.message || 'এই ইমেইল বা মোবাইল নম্বরে কোনো অ্যাকাউন্ট পাওয়া যায়নি। দয়া করে প্রথমে "Register" করুন।');
+        }
       } finally {
         setIsLoading(false);
       }
@@ -246,6 +274,72 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <span>{isLoading ? 'Connecting Google...' : 'Continue with Google'}</span>
         </button>
 
+        {/* Guided instructions if domain is unauthorized in Firebase */}
+        {unauthorizedDomain && (
+          <div className="mb-4 p-3.5 bg-amber-950/90 border border-amber-500/70 rounded-2xl text-left text-xs text-amber-100 shadow-[0_10px_25px_rgba(0,0,0,0.6)] space-y-2.5">
+            <div className="flex items-center justify-between gap-1">
+              <div className="flex items-center gap-1.5 text-amber-300 font-bold">
+                <Globe className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>Google Sign-in ডোমেইন অনুমোদন</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setUnauthorizedDomain(null)}
+                className="text-white/40 hover:text-white p-0.5"
+                title="Dismiss"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <p className="text-[11px] text-white/90 leading-relaxed">
+              Google Auth পলিসি অনুযায়ী আপনার লাইভ সাইটের ডোমেইনটি Firebase Console-এ যোগ করতে হবে:
+            </p>
+
+            <div className="bg-black/60 p-2 rounded-xl border border-white/10 flex items-center justify-between gap-2">
+              <div className="truncate">
+                <span className="text-[9px] text-white/50 block">যোগ করার ডোমেইন:</span>
+                <code className="text-xs text-[#FFD34E] font-mono font-bold">{unauthorizedDomain}</code>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(unauthorizedDomain);
+                  setCopiedDomain(true);
+                  setTimeout(() => setCopiedDomain(false), 2500);
+                }}
+                className="px-2.5 py-1 bg-white/15 hover:bg-white/25 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 shrink-0 transition-colors cursor-pointer"
+              >
+                {copiedDomain ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>{copiedDomain ? 'কপি হয়েছে' : 'Copy'}</span>
+              </button>
+            </div>
+
+            <div className="text-[10px] text-white/80 space-y-1">
+              <p className="font-bold text-amber-300">১ মিনিটে কীভাবে ডোমেইন যোগ করবেন:</p>
+              <p>১. নীচের বাটনে ক্লিক করে Firebase Authentication Settings খুলুন।</p>
+              <p>২. <strong>Authorized domains</strong> সেকশনে গিয়ে <strong>Add domain</strong> চাপুন।</p>
+              <p>৩. কপি করা <code>{unauthorizedDomain}</code> পেস্ট করে <strong>Save</strong> করুন।</p>
+            </div>
+
+            <div className="pt-1 flex items-center gap-2">
+              <a
+                href="https://console.firebase.google.com/project/bcastudypoint-cdfdf/authentication/settings"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 bg-[#FFD34E] text-black font-extrabold text-xs rounded-xl shadow-md hover:bg-[#FFE7A3] transition-colors"
+              >
+                <span>Firebase Console সেটিংস খুলুন</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+
+            <p className="text-[10px] text-[#FFE7A3]/90 text-center pt-1 border-t border-white/10">
+              💡 কোনো ডোমেইন সেটিংস ছাড়াও সরাসরি নীচের মোবাইল নম্বর দিয়ে অবিলম্বে লগইন/রেজিস্টার করতে পারবেন।
+            </p>
+          </div>
+        )}
+
         <div className="flex items-center gap-2 mb-3.5">
           <div className="flex-1 h-px bg-white/15" />
           <span className="text-[10px] text-white/50 uppercase font-bold">
@@ -255,25 +349,62 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3.5">
-          {error && (
-            <div className="p-3 bg-rose-950/80 border border-rose-500/50 rounded-xl text-xs text-rose-200 text-left">
-              <p>{error}</p>
-              {!isRegister && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsRegister(true);
-                    setError('');
-                    const clean = email.trim();
-                    if (/^\d{10}$/.test(clean)) {
-                      setMobile(clean);
-                      setEmail('');
-                    }
-                  }}
-                  className="mt-2 text-xs font-bold text-[#FFD34E] hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <span>👉 এখানে ক্লিক করে ১ মিনিটে অ্যাকাউন্ট রেজিস্টার করুন</span>
-                </button>
+          {error && !unauthorizedDomain && (
+            <div className="p-3.5 bg-rose-950/90 border border-rose-500/60 rounded-xl text-xs text-rose-200 text-left space-y-2 shadow-lg">
+              {blockedActiveDevice ? (
+                <div>
+                  <div className="flex items-center gap-2 text-amber-300 font-bold mb-1.5">
+                    <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span className="text-sm">অন্য ডিভাইসে সক্রিয় রয়েছে!</span>
+                  </div>
+                  <p className="text-xs text-white/95 leading-relaxed">
+                    আপনার এই অ্যাকাউন্টে ইতিমধ্যেই অন্য একটি ডিভাইসে লগইন রয়েছে। নিরাপত্তা নিশ্চিত করতে একসাথে কেবল <strong>১টি ডিভাইসে</strong> অ্যাক্সেস অনুমোদিত।
+                  </p>
+
+                  {typeof blockedActiveDevice === 'object' && blockedActiveDevice.os && (
+                    <div className="mt-2.5 p-2 bg-black/50 border border-white/10 rounded-lg text-[11px] text-white/80 space-y-1">
+                      <div className="flex items-center gap-1.5 text-amber-200 font-semibold">
+                        <Smartphone className="w-3.5 h-3.5 text-amber-300" />
+                        <span>বর্তমানে সক্রিয় ডিভাইস: {blockedActiveDevice.os} ({blockedActiveDevice.browser || 'Browser'})</span>
+                      </div>
+                      {blockedActiveDevice.lastSeenAt && (
+                        <div className="flex items-center gap-1.5 text-white/60 text-[10px]">
+                          <Clock className="w-3 h-3 text-white/40" />
+                          <span>সর্বশেষ সক্রিয়: {new Date(blockedActiveDevice.lastSeenAt).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="mt-2.5 pt-2 border-t border-rose-500/30 text-[11px] text-[#FFE7A3]">
+                    <p className="font-semibold text-amber-300">কীভাবে এই ডিভাইসে লগইন করবেন?</p>
+                    <p className="text-white/80 mt-0.5">
+                      ১. আপনার আগের ফোন বা কম্পিউটার থেকে <strong>Logout</strong> বাটনে ক্লিক করুন।<br/>
+                      ২. এরপর এখানে আবার লগইন করলে সাথে সাথে খুলে যাবে।
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p>{error}</p>
+                  {!isRegister && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRegister(true);
+                        setError('');
+                        const clean = email.trim();
+                        if (/^\d{10}$/.test(clean)) {
+                          setMobile(clean);
+                          setEmail('');
+                        }
+                      }}
+                      className="mt-2 text-xs font-bold text-[#FFD34E] hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>👉 এখানে ক্লিক করে ১ মিনিটে অ্যাকাউন্ট রেজিস্টার করুন</span>
+                    </button>
+                  )}
+                </>
               )}
             </div>
           )}

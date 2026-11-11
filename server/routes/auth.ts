@@ -5,11 +5,11 @@ export const authRouter = Router();
 
 /**
  * POST /api/auth/student-register
- * Validates and registers a new student account
+ * Validates and registers a new student account, and binds their active device
  */
 authRouter.post('/student-register', (req, res) => {
   try {
-    const { fullName, email, mobile, collegeName } = req.body;
+    const { fullName, email, mobile, collegeName, deviceInfo } = req.body;
 
     if (!fullName || typeof fullName !== 'string' || fullName.trim().length < 2) {
       return res.status(400).json({
@@ -48,6 +48,20 @@ authRouter.post('/student-register', (req, res) => {
       ip: clientIp,
     });
 
+    // Bind current device as active
+    if (deviceInfo?.token) {
+      db.checkAndBindStudentDevice({
+        userId: student.id,
+        userEmail: student.email,
+        studentName: student.fullName,
+        deviceToken: deviceInfo.token,
+        deviceDescription: deviceInfo.userAgent,
+        os: deviceInfo.os,
+        browser: deviceInfo.browser,
+        ip: clientIp,
+      });
+    }
+
     res.json({
       success: true,
       student: {
@@ -65,11 +79,12 @@ authRouter.post('/student-register', (req, res) => {
 
 /**
  * POST /api/auth/student-login
- * Verifies that the student exists before logging in
+ * Verifies student existence AND enforces Single Active Device policy:
+ * If an active device is currently logged in on another device, blocks second device until logout!
  */
 authRouter.post('/student-login', (req, res) => {
   try {
-    const { identifier } = req.body;
+    const { identifier, deviceInfo } = req.body;
     if (!identifier || typeof identifier !== 'string' || !identifier.trim()) {
       return res.status(400).json({
         success: false,
@@ -88,9 +103,33 @@ authRouter.post('/student-login', (req, res) => {
       });
     }
 
+    const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
+
+    // Enforce 1 Student = 1 Active Device Policy
+    if (deviceInfo?.token) {
+      const bindResult = db.checkAndBindStudentDevice({
+        userId: student.id,
+        userEmail: student.email,
+        studentName: student.fullName,
+        deviceToken: deviceInfo.token,
+        deviceDescription: deviceInfo.userAgent,
+        os: deviceInfo.os,
+        browser: deviceInfo.browser,
+        ip: clientIp,
+      });
+
+      if (!bindResult.success && bindResult.error === 'DEVICE_ALREADY_ACTIVE') {
+        return res.status(403).json({
+          success: false,
+          error: 'DEVICE_ALREADY_ACTIVE',
+          message: bindResult.message || 'আপনার অ্যাকাউন্টটি ইতিমধ্যে অন্য একটি ডিভাইসে সক্রিয় রয়েছে। একটি অ্যাকাউন্টে একসাথে কেবল ১টি ডিভাইসে লগইন রাখা অনুমোদিত। অনুগ্রহ করে আপনার পূর্বের ডিভাইস থেকে লগআউট করুন, অথবা কলেজ অ্যাডমিনের সহায়তা নিন।',
+          activeDevice: bindResult.activeDevice,
+        });
+      }
+    }
+
     // Update last login
     student.lastLoginAt = new Date().toISOString();
-    const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
     student.lastIp = clientIp;
 
     res.json({
@@ -103,6 +142,89 @@ authRouter.post('/student-login', (req, res) => {
         collegeName: student.collegeName,
       },
     });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/auth/google-login
+ * Handles Google Sign-In with Single Active Device policy
+ */
+authRouter.post('/google-login', (req, res) => {
+  try {
+    const { email, fullName, googleUid, photoUrl, deviceInfo } = req.body;
+
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ success: false, error: 'Google ইমেইল পাওয়া যায়নি।' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
+
+    // Find existing student or register new
+    let student = db.getStudentByEmail(cleanEmail);
+    if (!student) {
+      student = db.upsertStudent({
+        fullName: fullName || cleanEmail.split('@')[0] || 'BCA Student',
+        email: cleanEmail,
+        mobile: '',
+        ip: clientIp,
+      });
+    }
+
+    // Enforce 1 Student = 1 Active Device Policy
+    if (deviceInfo?.token) {
+      const bindResult = db.checkAndBindStudentDevice({
+        userId: student.id,
+        userEmail: student.email,
+        studentName: student.fullName,
+        deviceToken: deviceInfo.token,
+        deviceDescription: deviceInfo.userAgent,
+        os: deviceInfo.os,
+        browser: deviceInfo.browser,
+        ip: clientIp,
+      });
+
+      if (!bindResult.success && bindResult.error === 'DEVICE_ALREADY_ACTIVE') {
+        return res.status(403).json({
+          success: false,
+          error: 'DEVICE_ALREADY_ACTIVE',
+          message: bindResult.message || 'আপনার অ্যাকাউন্টটি ইতিমধ্যে অন্য একটি ডিভাইসে সক্রিয় রয়েছে। একটি অ্যাকাউন্টে একসাথে কেবল ১টি ডিভাইসে লগইন রাখা অনুমোদিত। অনুগ্রহ করে আপনার পূর্বের ডিভাইস থেকে লগআউট করুন, অথবা কলেজ অ্যাডমিনের সহায়তা নিন।',
+          activeDevice: bindResult.activeDevice,
+        });
+      }
+    }
+
+    student.lastLoginAt = new Date().toISOString();
+    student.lastIp = clientIp;
+
+    res.json({
+      success: true,
+      student: {
+        id: student.id,
+        fullName: student.fullName,
+        email: student.email,
+        mobile: student.mobile,
+        collegeName: student.collegeName,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/auth/student-logout
+ * Releases the active device session so the student can log in from another device!
+ */
+authRouter.post('/student-logout', (req, res) => {
+  try {
+    const { studentId } = req.body;
+    if (studentId) {
+      db.releaseStudentDevice(studentId);
+    }
+    res.json({ success: true, message: 'Logged out successfully' });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

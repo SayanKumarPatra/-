@@ -101,7 +101,7 @@ export interface DeviceBinding {
   registeredAt: string;
   lastSeenAt: string;
   lastIp: string;
-  registrationStatus: 'active' | 'revoked';
+  registrationStatus: 'active' | 'revoked' | 'logged_out';
   resetCount: number;
 }
 

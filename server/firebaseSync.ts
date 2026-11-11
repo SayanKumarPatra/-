@@ -90,4 +90,23 @@ export const firebaseSync = {
     if (!orderId) return;
     return safeRtdbFetch(`orders/${orderId}`, 'DELETE');
   },
+
+  /**
+   * Sync active device session status for single-device enforcement
+   */
+  async syncActiveDevice(studentId: string, deviceData: any) {
+    if (!studentId) return;
+    return safeRtdbFetch(`students/${studentId}/activeDevice`, 'PUT', {
+      ...deviceData,
+      updatedAt: new Date().toISOString(),
+    });
+  },
+
+  /**
+   * Clear active device session upon student logout
+   */
+  async clearActiveDevice(studentId: string) {
+    if (!studentId) return;
+    return safeRtdbFetch(`students/${studentId}/activeDevice`, 'DELETE');
+  },
 };

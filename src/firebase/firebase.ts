@@ -251,6 +251,48 @@ export function subscribeToStudentProfile(
 }
 
 /**
+ * Real-time Active Device Session Sync for Single-Device Enforcement
+ */
+export async function syncActiveDeviceRealtime(studentId: string, deviceData: any): Promise<void> {
+  if (!studentId) return;
+  const now = new Date().toISOString();
+  try {
+    await rtdbSet(rtdbRef(rtdb, `students/${studentId}/activeDevice`), {
+      ...deviceData,
+      loggedIn: true,
+      lastSeenAt: now,
+    });
+  } catch (e) {
+    console.warn('RTDB active device sync error:', e);
+  }
+}
+
+/**
+ * Real-time Release Active Device Session on Logout
+ */
+export async function releaseActiveDeviceRealtime(studentId: string): Promise<void> {
+  if (!studentId) return;
+  try {
+    await rtdbSet(rtdbRef(rtdb, `students/${studentId}/activeDevice`), null);
+  } catch (e) {
+    console.warn('RTDB release active device error:', e);
+  }
+}
+
+/**
+ * Subscribe to student's active device changes in Realtime Database
+ */
+export function subscribeToActiveDeviceRealtime(
+  studentId: string,
+  onUpdate: (device: any) => void
+): () => void {
+  const deviceRef = rtdbRef(rtdb, `students/${studentId}/activeDevice`);
+  return rtdbOnValue(deviceRef, (snapshot) => {
+    onUpdate(snapshot.val());
+  });
+}
+
+/**
  * Real-time Order Sync
  * Stores the order directly in Firebase Realtime Database
  */
