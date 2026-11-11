@@ -166,9 +166,33 @@
   user-select: none;
 }
 
-/* Prevent screen printing */
+/* Secure PDF Viewer Content Protection & Printable Receipts */
 @media print {
-  html, body {
+  /* When printing the official payment receipt */
+  body:has(#printable-receipt) {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  body:has(#printable-receipt) * {
+    visibility: hidden;
+  }
+  body:has(#printable-receipt) #printable-receipt,
+  body:has(#printable-receipt) #printable-receipt * {
+    visibility: visible;
+  }
+  body:has(#printable-receipt) #printable-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 20px !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Prevent printing protected PDF viewer contents */
+  body:not(:has(#printable-receipt)) {
     display: none !important;
     visibility: hidden !important;
   }

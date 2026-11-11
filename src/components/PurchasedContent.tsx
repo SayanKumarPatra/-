@@ -9,18 +9,21 @@ import {
   RefreshCw,
   Clock,
   CheckCircle2,
-  ShoppingBag,
   AlertTriangle,
   MessageSquare,
   ChevronRight,
   Search,
-  PhoneCall,
+  FileText,
+  CreditCard,
+  Printer,
+  Sparkles,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { BRAND } from '../constants/brand';
 import { FALLBACK_PRODUCTS } from '../constants/fallbackProducts';
 import { subscribeToOrdersRealtime } from '../firebase/firebase';
+import { PaymentReceiptModal } from './PaymentReceiptModal';
 import type { Order } from '../types';
 
 interface PurchasedContentProps {
@@ -41,7 +44,13 @@ export const PurchasedContent: React.FC<PurchasedContentProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Manual lookup state (for students entering phone or order ID)
+  // Primary Tab Switcher: 'notes' (Default clean view) vs 'payments' (Dedicated Payment History)
+  const [activeTab, setActiveTab] = useState<'notes' | 'payments'>('notes');
+
+  // Receipt Modal State
+  const [selectedReceiptOrder, setSelectedReceiptOrder] = useState<Order | null>(null);
+
+  // Manual lookup state (for students searching by phone or order ID)
   const [lookupQuery, setLookupQuery] = useState('');
   const [lookupActiveQuery, setLookupActiveQuery] = useState('');
 
@@ -198,6 +207,21 @@ export const PurchasedContent: React.FC<PurchasedContentProps> = ({
     return Array.from(purchasesMap.values());
   }, [apiPurchases, matchedOrders]);
 
+  const activePurchases = useMemo(
+    () => resolvedPurchases.filter((p) => p.accessStatus === 'active'),
+    [resolvedPurchases]
+  );
+
+  const pendingPurchases = useMemo(
+    () => resolvedPurchases.filter((p) => p.accessStatus !== 'active'),
+    [resolvedPurchases]
+  );
+
+  const pendingOrdersCount = useMemo(
+    () => matchedOrders.filter((o) => o.paymentStatus === 'pending').length,
+    [matchedOrders]
+  );
+
   const hasAnyItems = matchedOrders.length > 0 || resolvedPurchases.length > 0;
 
   const handleLookupSubmit = (e: React.FormEvent) => {
@@ -223,58 +247,57 @@ export const PurchasedContent: React.FC<PurchasedContentProps> = ({
   };
 
   return (
-    <div className="max-w-5xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-6">
-      {/* Title & Device Bar */}
+    <div className="max-w-5xl mx-auto py-6 sm:py-8 px-4 sm:px-6 lg:px-8 space-y-6">
+      {/* 1. Header & Device Protection Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-white/15">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-              My Notes
+              My Library &amp; Notes
             </h1>
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#FFD34E]/20 text-[#FFD34E] border border-[#FFD34E]/40">
               Student Dashboard
             </span>
           </div>
           <p className="text-xs text-[#FFE7A3] mt-1">
-            আপনার অর্ডারের তালিকা ও অনুমোদিত স্টাডি নোটস —{' '}
             {student ? (
-              <span className="font-bold text-white">
-                {student.fullName} ({student.mobile || student.email})
-              </span>
+              <>
+                স্বাগতম, <strong className="text-white">{student.fullName}</strong> (📱 {student.mobile || student.email})
+              </>
             ) : (
-              <span className="text-white/80">পেমেন্ট ভেরিফিকেশন ও ডিজিটাল রিডার</span>
+              'আপনার অনুমোদিত স্টাডি নোটস এবং পেমেন্ট হিস্ট্রি'
             )}
           </p>
         </div>
 
-        {/* Device Status */}
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-black/40 border border-[#FFE7A3]/30 rounded-xl text-xs font-semibold text-white backdrop-blur-md shadow-sm">
+        {/* Device Status Tag */}
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-black/40 border border-[#FFE7A3]/30 rounded-xl text-xs font-semibold text-white backdrop-blur-md shadow-sm">
           <Laptop className="w-4 h-4 text-[#FFD34E]" />
-          <span>Device: {deviceInfo.browser} on {deviceInfo.os}</span>
+          <span>Device: {deviceInfo.browser}</span>
           <span className="text-[#FFD34E]">·</span>
           <span className="text-emerald-400 font-bold">1:1 Protected</span>
         </div>
       </div>
 
-      {/* QUICK ORDER LOOKUP BAR (Ensures every live customer finds their order instantly) */}
-      <div className="liquid-glass-master rounded-2xl p-4 sm:p-5 border border-[#FFE7A3]/30 shadow-lg">
-        <form onSubmit={handleLookupSubmit} className="flex flex-col sm:flex-row items-center gap-3">
+      {/* 2. ORDER LOOKUP BAR */}
+      <div className="liquid-glass-master rounded-2xl p-3.5 sm:p-4 border border-[#FFE7A3]/25 shadow-md">
+        <form onSubmit={handleLookupSubmit} className="flex flex-col sm:flex-row items-center gap-2.5">
           <div className="relative flex-1 w-full">
             <Search className="w-4 h-4 text-[#FFD34E] absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={lookupQuery}
               onChange={(e) => setLookupQuery(e.target.value)}
-              placeholder="মোবাইল নম্বর বা অর্ডার আইডি লিখুন (e.g. 9830112233 বা ORD-202611...)"
-              className="w-full pl-10 pr-4 py-2.5 text-xs bg-black/50 border border-white/20 rounded-full text-white placeholder-white/50 focus:outline-none focus:border-[#FFD34E]"
+              placeholder="মোবাইল নম্বর বা অর্ডার আইডি দিয়ে খুঁজুন (e.g. 9830112233 বা ORD-...)"
+              className="w-full pl-10 pr-4 py-2 text-xs bg-black/50 border border-white/20 rounded-full text-white placeholder-white/50 focus:outline-none focus:border-[#FFD34E]"
             />
           </div>
           <button
             type="submit"
-            className="btn-gold-primary w-full sm:w-auto px-6 py-2.5 text-xs font-black rounded-full cursor-pointer flex items-center justify-center gap-1.5 shadow-md shrink-0"
+            className="btn-gold-primary w-full sm:w-auto px-5 py-2 text-xs font-black rounded-full cursor-pointer flex items-center justify-center gap-1.5 shadow-sm shrink-0"
           >
             <Search className="w-3.5 h-3.5" />
-            <span>অর্ডার খুঁজুন (Find Order)</span>
+            <span>অর্ডার খুঁজুন</span>
           </button>
           {lookupActiveQuery && (
             <button
@@ -289,17 +312,71 @@ export const PurchasedContent: React.FC<PurchasedContentProps> = ({
             </button>
           )}
         </form>
-        {lookupActiveQuery && (
-          <p className="text-[11px] text-[#FFE7A3] mt-2 pl-2">
-            Viewing results for: <strong className="text-white">{lookupActiveQuery}</strong> ({matchedOrders.length} order(s) found)
-          </p>
-        )}
       </div>
 
+      {/* 3. ELEGANT OPTION / TAB SWITCHER (Clean Study Notes vs Payment History) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/40 p-1.5 rounded-2xl border border-white/15 backdrop-blur-xl">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {/* Option 1: Study Materials & Books (Default Normal View) */}
+          <button
+            onClick={() => setActiveTab('notes')}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              activeTab === 'notes'
+                ? 'bg-gradient-to-r from-[#970014] to-[#65000D] text-white border border-[#FFD34E]/60 shadow-[0_4px_15px_rgba(151,0,20,0.5)]'
+                : 'text-white/70 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <BookOpen className="w-4 h-4 text-[#FFD34E]" />
+            <span>আমার স্টাডি মেটেরিয়ালস (Study Materials)</span>
+            {resolvedPurchases.length > 0 && (
+              <span className={`px-2 py-0.2 rounded-full text-[10px] font-bold ${
+                activeTab === 'notes' ? 'bg-[#FFD34E] text-[#3D0009]' : 'bg-white/10 text-white/80'
+              }`}>
+                {activePurchases.length}
+              </span>
+            )}
+          </button>
+
+          {/* Option 2: Payment History & Receipts (The user requested option) */}
+          <button
+            onClick={() => setActiveTab('payments')}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer relative ${
+              activeTab === 'payments'
+                ? 'bg-gradient-to-r from-[#970014] to-[#65000D] text-white border border-[#FFD34E]/60 shadow-[0_4px_15px_rgba(151,0,20,0.5)]'
+                : 'text-white/70 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <CreditCard className="w-4 h-4 text-[#FFD34E]" />
+            <span>পেমেন্ট হিস্ট্রি ও রসিদ (Payment History)</span>
+            {matchedOrders.length > 0 && (
+              <span className={`px-2 py-0.2 rounded-full text-[10px] font-bold ${
+                activeTab === 'payments' ? 'bg-[#FFD34E] text-[#3D0009]' : 'bg-white/10 text-white/80'
+              }`}>
+                {matchedOrders.length}
+              </span>
+            )}
+            {pendingOrdersCount > 0 && (
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping absolute -top-1 -right-1" />
+            )}
+          </button>
+        </div>
+
+        {/* Refresh / Polling Button */}
+        <button
+          onClick={() => loadBackendPurchases(false)}
+          className="self-end sm:self-auto flex items-center gap-1 text-[11px] font-semibold text-[#FFE7A3]/80 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+          title="রিফ্রেশ করুন"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-[#FFD34E]' : ''}`} />
+          <span>Refresh</span>
+        </button>
+      </div>
+
+      {/* 4. MAIN CONTENT AREA */}
       {isLoading && !hasAnyItems ? (
         <div className="flex flex-col items-center justify-center py-20 text-[#FFE7A3]">
           <Loader2 className="w-9 h-9 animate-spin text-[#FFD34E] mb-3" />
-          <span className="text-sm font-semibold">আপনার অর্ডার ও নোটস যাচাই করা হচ্ছে...</span>
+          <span className="text-sm font-semibold">আপনার তথ্য লোড করা হচ্ছে...</span>
         </div>
       ) : error && !hasAnyItems ? (
         <div className="p-4 bg-rose-950/70 border border-rose-500/40 rounded-2xl text-xs text-rose-200 flex items-center justify-between">
@@ -313,13 +390,14 @@ export const PurchasedContent: React.FC<PurchasedContentProps> = ({
           </button>
         </div>
       ) : !hasAnyItems ? (
+        /* Empty State */
         <div className="liquid-glass-master rounded-3xl p-10 text-center border border-[#FFE7A3]/30 shadow-2xl space-y-4">
           <div className="w-14 h-14 bg-white/10 rounded-full flex items-center justify-center mx-auto text-[#FFE7A3] mb-3">
             <BookOpen className="w-7 h-7" />
           </div>
-          <h3 className="text-base font-extrabold text-white">No Orders or Question Banks Found</h3>
+          <h3 className="text-base font-extrabold text-white">No Question Banks or Orders Found</h3>
           <p className="text-xs text-white/75 max-w-md mx-auto leading-relaxed">
-            যদি আপনি ইতিমধ্যে পেমেন্ট করে থাকেন, দয়া করে ওপরের বক্সে আপনার <strong>১০ সংখ্যার মোবাইল নম্বর</strong> দিয়ে <strong>'অর্ডার খুঁজুন'</strong> বাটনে ক্লিক করুন। অথবা আমাদের BCA বিষয়ের তালিকা থেকে সিলেক্ট করে অর্ডার করুন।
+            যদি আপনি ইতিমধ্যে পেমেন্ট করে থাকেন, দয়া করে ওপরের বক্সে আপনার <strong>১০ সংখ্যার মোবাইল নম্বর</strong> দিয়ে <strong>'অর্ডার খুঁজুন'</strong> বাটনে ক্লিক করুন। অথবা আমাদের BCA প্রশ্নপত্রের তালিকা থেকে বিষয় নির্বাচন করুন।
           </p>
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
             <button
@@ -331,7 +409,7 @@ export const PurchasedContent: React.FC<PurchasedContentProps> = ({
             </button>
             <a
               href={`https://wa.me/91${BRAND.payment?.whatsappPhone || '9382040746'}?text=${encodeURIComponent(
-                'Hello BCA STUDY POINT, I completed payment but need assistance locating my order.'
+                'Hello BCA STUDY POINT, I completed payment but need assistance accessing my study materials.'
               )}`}
               target="_blank"
               rel="noopener noreferrer"
@@ -342,263 +420,312 @@ export const PurchasedContent: React.FC<PurchasedContentProps> = ({
             </a>
           </div>
         </div>
-      ) : (
-        <div className="space-y-6">
-          {/* 1. ORDER VERIFICATION STATUS CARDS (Order History & Trust Proof) */}
-          {matchedOrders.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-xs font-bold text-[#FFE7A3] px-1">
-                <span className="flex items-center gap-1.5 text-sm font-black text-white">
-                  <ShoppingBag className="w-4 h-4 text-[#FFD34E]" />
-                  <span>আপনার অর্ডারের হিস্টোরি ও স্ট্যাটাস ({matchedOrders.length})</span>
-                </span>
-                <button
-                  onClick={() => loadBackendPurchases(false)}
-                  className="flex items-center gap-1 text-[11px] text-white/70 hover:text-white cursor-pointer"
-                  title="রিফ্রেশ করুন"
-                >
-                  <RefreshCw className="w-3 h-3" />
-                  <span>Refresh Status</span>
-                </button>
+      ) : activeTab === 'notes' ? (
+        /* ========================================================================= */
+        /* TAB 1: NORMAL VIEW - CLEAN STUDY MATERIALS & PDF ACCESS (User's Main Goal) */
+        /* ========================================================================= */
+        <div className="space-y-4">
+          {/* Non-intrusive Pending Approval Alert Banner (Directing to Payment History option) */}
+          {pendingOrdersCount > 0 && (
+            <div className="p-3.5 bg-gradient-to-r from-amber-950/60 to-[#3D0009]/80 border border-amber-400/50 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-md">
+              <div className="flex items-start gap-2.5">
+                <Clock className="w-4 h-4 text-amber-300 shrink-0 mt-0.5 animate-pulse" />
+                <div>
+                  <span className="font-bold text-amber-200">
+                    আপনার {pendingOrdersCount}টি অর্ডারের পেমেন্ট ভেরিফিকেশন চলছে
+                  </span>
+                  <p className="text-[#FFE7A3]/90 text-[11px] mt-0.5">
+                    অ্যাডমিন যাচাই অনুমোদন দেওয়া মাত্রই আপনার প্রশ্নপত্র পড়ার জন্য প্রস্তুত হবে।
+                  </p>
+                </div>
               </div>
-
-              <div className="space-y-3">
-                {matchedOrders.map((ord) => (
-                  <div
-                    key={ord.orderId}
-                    className={`liquid-glass-master rounded-2xl p-4 sm:p-5 border shadow-xl relative overflow-hidden transition-all ${
-                      ord.paymentStatus === 'verified'
-                        ? 'border-emerald-500/40 bg-emerald-950/20'
-                        : ord.paymentStatus === 'rejected' || ord.paymentStatus === 'failed'
-                        ? 'border-rose-500/40 bg-rose-950/20'
-                        : 'border-amber-400/50 bg-amber-950/25 ring-1 ring-amber-400/30'
-                    }`}
-                  >
-                    {/* Header Row: Order ID, Amount, Status Badge */}
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-white/10">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-black text-[#FFD34E] bg-black/40 px-2.5 py-0.5 rounded border border-white/15">
-                            {ord.orderId}
-                          </span>
-                          <span className="text-xs text-white/60">
-                            {new Date(ord.createdAt).toLocaleDateString('en-IN', {
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </span>
-                        </div>
-                        <div className="text-xs text-white/80 mt-1 flex flex-wrap items-center gap-2">
-                          <span>
-                            Total: <strong className="text-[#FFD34E] text-sm font-black">₹{ord.totalAmount}</strong>
-                          </span>
-                          {ord.paymentReference && (
-                            <>
-                              <span className="text-white/30">·</span>
-                              <span>
-                                UTR / Ref:{' '}
-                                <strong className="font-mono text-white text-[11px] bg-black/40 px-1.5 py-0.5 rounded">
-                                  {ord.paymentReference.replace('upi_', '')}
-                                </strong>
-                              </span>
-                            </>
-                          )}
-                          {ord.studentMobile && (
-                            <>
-                              <span className="text-white/30">·</span>
-                              <span className="text-white/70">📱 {ord.studentMobile}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Status Badge */}
-                      <div>
-                        {ord.paymentStatus === 'verified' ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-500/20 text-emerald-300 border border-emerald-400/50 shadow-sm">
-                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                            <span>অনুমোদিত ও সক্রিয় (Access Approved)</span>
-                          </span>
-                        ) : ord.paymentStatus === 'rejected' || ord.paymentStatus === 'failed' ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-400/50">
-                            <AlertTriangle className="w-4 h-4 text-rose-400" />
-                            <span>পেমেন্ট বাতিল (Verification Failed)</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-amber-500/20 text-amber-200 border border-amber-400/60 shadow-sm animate-pulse">
-                            <Clock className="w-4 h-4 text-amber-300" />
-                            <span>পেমেন্ট যাচাইকরণ চলছে (Pending Verification)</span>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Explanatory Banner & WhatsApp Help */}
-                    <div className="mt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                      {ord.paymentStatus === 'verified' ? (
-                        <div className="text-emerald-300/90 leading-relaxed">
-                          ✓ <strong>অ্যাডমিন আপনার পেমেন্ট যাচাই করে অনুমোদন দিয়েছেন:</strong> নীচের বিষয়ের তালিকা থেকে <strong>'এখনই পড়ুন'</strong> বাটনে ক্লিক করে সম্পূর্ণ নোটস পড়ুন।
-                        </div>
-                      ) : ord.paymentStatus === 'rejected' || ord.paymentStatus === 'failed' ? (
-                        <div className="text-rose-200 leading-relaxed">
-                          ✕ <strong>পেমেন্ট ভেরিফিকেশন সফল হয়নি:</strong> সঠিক UTR রেফারেন্স দিন বা নীচের হোয়াটসঅ্যাপে যোগাযোগ করুন।
-                        </div>
-                      ) : (
-                        <div className="text-[#FFE7A3] leading-relaxed">
-                          ⏳ <strong>অ্যাডমিন আপনার পেমেন্ট যাচাই করছেন:</strong> আপনার অর্ডার সফলভাবে জমা হয়েছে। অ্যাডমিন পেমেন্ট UTR চেক করে অনুমোদন দেওয়া মাত্রই আপনার বিষয়ের সমস্ত পিডিএফ নোটস সাথে সাথে পড়তে পারবেন।
-                        </div>
-                      )}
-
-                      {/* Direct WhatsApp Verification Query Button */}
-                      <a
-                        href={`https://wa.me/91${BRAND.payment?.whatsappPhone || '9382040746'}?text=${encodeURIComponent(
-                          `Hello BCA STUDY POINT,\nMy order ${ord.orderId} is placed for ₹${ord.totalAmount}.\nUTR: ${ord.paymentReference || 'N/A'}\nStudent Name: ${ord.studentName || student?.fullName || 'Student'}\n\nPlease verify and approve my notes access.`
-                        )}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="shrink-0 px-3.5 py-1.5 rounded-full bg-emerald-600/80 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        <span>হোয়াটসঅ্যাপে হেল্প নিন</span>
-                      </a>
-                    </div>
-
-                    {/* Items pills */}
-                    <div className="mt-3 pt-2.5 border-t border-white/10 flex flex-wrap items-center gap-2">
-                      <span className="text-[11px] text-white/60">Ordered Subjects:</span>
-                      {ord.items && ord.items.length > 0 ? (
-                        ord.items.map((it) => (
-                          <span
-                            key={it.productId}
-                            className="px-2 py-0.5 rounded text-[10px] font-bold bg-white/10 text-[#FFE7A3] border border-white/15"
-                          >
-                            {it.subjectCode} - {it.subjectName}
-                          </span>
-                        ))
-                      ) : (
-                        (ord.selectedProductIds || []).map((pid) => {
-                          const fb = FALLBACK_PRODUCTS.find((p) => p.id === pid);
-                          return (
-                            <span
-                              key={pid}
-                              className="px-2 py-0.5 rounded text-[10px] font-bold bg-white/10 text-[#FFE7A3] border border-white/15"
-                            >
-                              {fb?.subjectCode || pid} - {fb?.subjectName || ''}
-                            </span>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <button
+                onClick={() => setActiveTab('payments')}
+                className="self-start sm:self-auto px-4 py-1.5 rounded-full bg-amber-400 text-[#3D0009] font-black text-[11px] hover:bg-amber-300 transition-colors cursor-pointer shrink-0 shadow-xs"
+              >
+                পেমেন্ট হিস্ট্রি দেখুন →
+              </button>
             </div>
           )}
 
-          {/* 2. SUBJECTS LIST & PDF READER BUTTONS */}
-          <div className="space-y-3 pt-2">
+          {/* Subjects Grid & Reader Access */}
+          <div className="space-y-3">
             <div className="flex items-center justify-between text-xs font-bold text-[#FFE7A3] px-1">
               <span className="flex items-center gap-1.5 text-sm font-black text-white">
-                <BookOpen className="w-4 h-4 text-[#FFD34E]" />
-                <span>আপনার বিষয় ও স্টাডি নোটস তালিকা</span>
+                <Sparkles className="w-4 h-4 text-[#FFD34E]" />
+                <span>আপনার সিলেবাস অনুযায়ী স্টাডি নোটস ({resolvedPurchases.length})</span>
               </span>
-              <span className="text-[11px] text-white/60">
-                {resolvedPurchases.filter((p) => p.accessStatus === 'active').length}টি অ্যাক্টিভ নোটস
+              <span className="text-[11px] text-emerald-400 font-bold">
+                ✓ {activePurchases.length}টি নোটস পড়ার জন্য প্রস্তুত
               </span>
             </div>
 
-            <div className="divide-y divide-white/10 border border-[#FFE7A3]/30 rounded-2xl bg-black/35 backdrop-blur-xl shadow-2xl overflow-hidden">
-              {resolvedPurchases.length === 0 ? (
-                <div className="p-8 text-center text-white/70 space-y-2">
-                  <Clock className="w-8 h-8 text-amber-300 mx-auto animate-pulse" />
-                  <h4 className="text-sm font-bold text-white">পেমেন্ট ভেরিফিকেশন চলছে</h4>
-                  <p className="text-xs text-[#FFE7A3] max-w-md mx-auto">
-                    আপনার অর্ডারের বিষয়গুলো অ্যাডমিন যাচাই করছেন। অ্যাডমিন অনুমোদন দেওয়া মাত্রই এখানে পড়ার বাটন চলে আসবে।
-                  </p>
-                </div>
-              ) : (
-                resolvedPurchases.map((item) => (
-                  <div
-                    key={item.purchaseId || item.productId}
-                    className="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 hover:bg-white/5 transition-colors"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2 text-xs font-semibold text-[#FFD34E] mb-1">
-                        <span className="font-mono bg-[#970014]/60 border border-[#FFE7A3]/40 px-2 py-0.5 rounded text-[11px]">
-                          {item.subjectCode}
+            {resolvedPurchases.length === 0 ? (
+              <div className="p-10 text-center text-white/70 space-y-2 bg-black/40 rounded-2xl border border-white/10">
+                <Clock className="w-8 h-8 text-amber-300 mx-auto animate-pulse" />
+                <h4 className="text-sm font-bold text-white">পেমেন্ট ভেরিফিকেশন চলছে</h4>
+                <p className="text-xs text-[#FFE7A3] max-w-md mx-auto">
+                  আপনার নির্বাচিত বিষয়গুলো অ্যাডমিন যাচাই করছেন। অনুমোদন দেওয়া মাত্রই পড়ার বাটন চলে আসবে।
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {resolvedPurchases.map((item) => {
+                  const isActive = item.accessStatus === 'active';
+                  const fallback = FALLBACK_PRODUCTS.find((p) => p.id === item.productId);
+
+                  return (
+                    <div
+                      key={item.purchaseId || item.productId}
+                      className={`liquid-glass-master rounded-2xl p-5 border transition-all flex flex-col justify-between ${
+                        isActive
+                          ? 'border-emerald-500/40 hover:border-[#FFD34E]/60 bg-gradient-to-br from-[#65000D]/40 to-[#240005]/80'
+                          : 'border-amber-400/40 bg-gradient-to-br from-amber-950/20 to-[#240005]/80'
+                      }`}
+                    >
+                      <div>
+                        {/* Subject Top Badges */}
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span className="font-mono text-xs font-black text-[#FFD34E] bg-black/50 px-2.5 py-0.5 rounded border border-[#FFE7A3]/30">
+                            {item.subjectCode}
+                          </span>
+                          {isActive ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-300 bg-emerald-500/20 border border-emerald-400/40 px-2 py-0.5 rounded-full">
+                              <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                              <span>সক্রিয় (Active)</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-200 bg-amber-500/20 border border-amber-400/50 px-2 py-0.5 rounded-full animate-pulse">
+                              <Clock className="w-3 h-3 text-amber-300" />
+                              <span>যাচাইকরণ চলছে</span>
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Title */}
+                        <h3 className="text-base font-extrabold text-white leading-snug mb-1">
+                          {item.subjectName}
+                        </h3>
+
+                        <p className="text-xs text-[#FFE7A3]/80 line-clamp-2 mb-3">
+                          {fallback?.description || 'BCA 3rd Semester university exam-oriented question bank with complete solved solutions.'}
+                        </p>
+
+                        {/* Meta Specs */}
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-white/60 mb-4">
+                          <span className="bg-white/10 px-2 py-0.5 rounded">
+                            📄 {item.pageCount} Pages Solved
+                          </span>
+                          <span className="bg-white/10 px-2 py-0.5 rounded">
+                            🎓 {item.examYear || '2024-2025 Edition'}
+                          </span>
+                          <span className="bg-white/10 px-2 py-0.5 rounded font-mono text-[10px]">
+                            #{item.orderId}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Action Button */}
+                      <div className="pt-3 border-t border-white/10">
+                        {isActive ? (
+                          <button
+                            onClick={() => onOpenViewer(item.productId)}
+                            className="btn-gold-primary w-full py-2.5 px-4 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-2 cursor-pointer shadow-md hover:scale-[1.02] transition-transform"
+                          >
+                            <BookOpen className="w-4 h-4" />
+                            <span>এখনই পড়ুন (Read Question Bank)</span>
+                            <ChevronRight className="w-4 h-4 ml-0.5" />
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <button
+                              disabled
+                              className="flex-1 py-2 px-3 text-xs font-semibold rounded-xl bg-white/5 border border-white/10 text-white/40 cursor-not-allowed flex items-center justify-center gap-1.5"
+                            >
+                              <Lock className="w-3.5 h-3.5" />
+                              <span>অনুমোদনের অপেক্ষায়</span>
+                            </button>
+                            <a
+                              href={`https://wa.me/91${BRAND.payment?.whatsappPhone || '9382040746'}?text=${encodeURIComponent(
+                                `Hello BCA STUDY POINT,\nPlease activate access for ${item.subjectCode} under order ${item.orderId}.`
+                              )}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 text-emerald-400 bg-emerald-950/40 border border-emerald-500/40 rounded-xl hover:bg-emerald-900/50 transition-colors"
+                              title="Notify on WhatsApp"
+                            >
+                              <MessageSquare className="w-4 h-4" />
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* ========================================================================= */
+        /* TAB 2: DEDICATED PAYMENT HISTORY & OFFICIAL RECEIPTS OPTION (User Request) */
+        /* ========================================================================= */
+        <div className="space-y-4">
+          <div className="flex items-center justify-between text-xs font-bold text-[#FFE7A3] px-1">
+            <span className="flex items-center gap-1.5 text-sm font-black text-white">
+              <CreditCard className="w-4 h-4 text-[#FFD34E]" />
+              <span>আপনার সমস্ত পেমেন্ট হিস্ট্রি ও অফিশিয়াল রসিদ ({matchedOrders.length})</span>
+            </span>
+            <span className="text-[11px] text-white/60">
+              যেকোনো অর্ডারের পাশে 'রসিদ দেখুন' বাটনে ক্লিক করে মানি রসিদ ডাউনলোড করতে পারবেন
+            </span>
+          </div>
+
+          <div className="space-y-3.5">
+            {matchedOrders.map((ord) => {
+              const isVerified = ord.paymentStatus === 'verified';
+              const isFailed = ord.paymentStatus === 'rejected' || ord.paymentStatus === 'failed';
+              const cleanUtr = (ord.paymentReference || '').replace('upi_', '');
+
+              return (
+                <div
+                  key={ord.orderId}
+                  className={`liquid-glass-master rounded-2xl p-4 sm:p-5 border shadow-xl relative overflow-hidden transition-all ${
+                    isVerified
+                      ? 'border-emerald-500/40 bg-emerald-950/15'
+                      : isFailed
+                      ? 'border-rose-500/40 bg-rose-950/15'
+                      : 'border-amber-400/50 bg-amber-950/20'
+                  }`}
+                >
+                  {/* Order Card Header */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-white/10">
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-xs font-black text-[#FFD34E] bg-black/50 px-2.5 py-0.5 rounded border border-white/15">
+                          {ord.orderId}
                         </span>
-                        <span className="text-white/40" aria-hidden="true">·</span>
-                        <span className="text-white/70 font-normal">
-                          Order: <strong className="font-mono text-white">{item.orderId}</strong>
+                        <span className="text-xs text-white/70">
+                          {new Date(ord.createdAt).toLocaleDateString('en-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
                         </span>
                       </div>
 
-                      <h3 className="text-base sm:text-lg font-extrabold text-white">
-                        {item.subjectName}
-                      </h3>
-
-                      <div className="flex items-center gap-3 mt-1.5 text-xs text-white/70">
-                        <span>{item.pageCount} Pages Solved</span>
-                        <span aria-hidden="true" className="text-white/30">·</span>
-                        <span>{item.examYear || '2024-2025 Edition'}</span>
-                        <span aria-hidden="true" className="text-white/30">·</span>
-                        {item.accessStatus === 'active' ? (
-                          <span className="inline-flex items-center gap-1 text-emerald-400 font-bold">
-                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                            অ্যাক্সেস সক্রিয় (Active)
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-white/90">
+                        <span>
+                          Paid Amount: <strong className="text-[#FFD34E] font-black text-sm">₹{ord.totalAmount}</strong>
+                        </span>
+                        {cleanUtr && (
+                          <span>
+                            UTR: <strong className="font-mono text-[11px] bg-black/40 px-1.5 py-0.5 rounded text-white">{cleanUtr}</strong>
                           </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-amber-300 font-bold bg-amber-500/20 px-2 py-0.5 rounded-md border border-amber-400/40 animate-pulse">
-                            <Clock className="w-3 h-3 text-amber-300" />
-                            ভেরিফিকেশন চলছে (Verification in Progress)
-                          </span>
+                        )}
+                        {ord.studentMobile && (
+                          <span className="text-white/60">📱 {ord.studentMobile}</span>
                         )}
                       </div>
                     </div>
 
-                    <div className="shrink-0 flex flex-col sm:flex-row items-center gap-2">
-                      {item.accessStatus === 'active' ? (
-                        <button
-                          onClick={() => onOpenViewer(item.productId)}
-                          className="btn-gold-primary w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 text-xs font-black rounded-full cursor-pointer whitespace-nowrap shadow-[0_4px_15px_rgba(255,211,78,0.35)] hover:scale-105 transition-transform"
-                        >
-                          <BookOpen className="w-4 h-4" />
-                          <span>এখনই পড়ুন (Read Note)</span>
-                          <ChevronRight className="w-4 h-4 ml-0.5" />
-                        </button>
+                    {/* Status Badge */}
+                    <div>
+                      {isVerified ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-500/20 text-emerald-300 border border-emerald-400/50 shadow-sm">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                          <span>অনুমোদিত ও সক্রিয় (Verified)</span>
+                        </span>
+                      ) : isFailed ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-400/50">
+                          <AlertTriangle className="w-4 h-4 text-rose-400" />
+                          <span>বাতিল (Rejected)</span>
+                        </span>
                       ) : (
-                        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                          <button
-                            disabled
-                            className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-full bg-white/5 border border-white/10 text-white/40 cursor-not-allowed"
-                          >
-                            <Lock className="w-3.5 h-3.5" />
-                            <span>অনুমোদনের অপেক্ষায়</span>
-                          </button>
-                          <a
-                            href={`https://wa.me/91${BRAND.payment?.whatsappPhone || '9382040746'}?text=${encodeURIComponent(
-                              `Hello BCA STUDY POINT,\nPlease activate access for ${item.subjectCode} (${item.subjectName}) under order ${item.orderId}.`
-                            )}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-3 py-2 text-[11px] font-bold text-emerald-300 hover:text-emerald-200 bg-emerald-950/40 border border-emerald-500/30 rounded-full flex items-center justify-center gap-1"
-                          >
-                            <MessageSquare className="w-3 h-3" />
-                            <span>Notify Admin</span>
-                          </a>
-                        </div>
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-amber-500/20 text-amber-200 border border-amber-400/60 shadow-sm animate-pulse">
+                          <Clock className="w-4 h-4 text-amber-300" />
+                          <span>যাচাইকরণ চলছে (Pending)</span>
+                        </span>
                       )}
                     </div>
                   </div>
-                ))
-              )}
-            </div>
+
+                  {/* Purchased Subjects List */}
+                  <div className="py-2.5 flex flex-wrap items-center gap-1.5">
+                    <span className="text-[11px] text-white/60 mr-1">অন্তর্ভুক্ত বিষয়:</span>
+                    {ord.items && ord.items.length > 0 ? (
+                      ord.items.map((it) => (
+                        <span
+                          key={it.productId}
+                          className="px-2 py-0.5 rounded text-[11px] font-bold bg-white/10 text-[#FFE7A3] border border-white/15"
+                        >
+                          {it.subjectCode} - {it.subjectName}
+                        </span>
+                      ))
+                    ) : (
+                      (ord.selectedProductIds || []).map((pid) => {
+                        const fb = FALLBACK_PRODUCTS.find((p) => p.id === pid);
+                        return (
+                          <span
+                            key={pid}
+                            className="px-2 py-0.5 rounded text-[11px] font-bold bg-white/10 text-[#FFE7A3] border border-white/15"
+                          >
+                            {fb?.subjectCode || pid} - {fb?.subjectName || ''}
+                          </span>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Actions Row: View Receipt Modal Button & WhatsApp Help */}
+                  <div className="pt-3 border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
+                    <div className="text-[11px] text-white/70">
+                      {isVerified ? (
+                        <span className="text-emerald-300">✓ পেমেন্ট অনুমোদিত হয়েছে। অফিশিয়াল রসিদ সংগ্রহ করতে পারেন।</span>
+                      ) : (
+                        <span className="text-amber-200">⏳ অ্যাডমিন পেমেন্ট যাচাই করছেন (১০-২০ মিনিট সময় লাগতে পারে)।</span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {/* VIEW & PRINT RECEIPT BUTTON (Official Cash Memo Modal) */}
+                      <button
+                        onClick={() => setSelectedReceiptOrder(ord)}
+                        className="btn-gold-primary px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-sm hover:scale-105 transition-transform"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>রসিদ দেখুন / Receipt</span>
+                      </button>
+
+                      {/* WhatsApp Help */}
+                      <a
+                        href={`https://wa.me/91${BRAND.payment?.whatsappPhone || '9382040746'}?text=${encodeURIComponent(
+                          `Hello BCA STUDY POINT,\nInquiry about Order ${ord.orderId} (₹${ord.totalAmount}).\nUTR: ${cleanUtr || 'N/A'}\nStudent Name: ${ord.studentName || 'Student'}`
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 rounded-full bg-emerald-600/80 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>WhatsApp Help</span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
+
+      {/* Official Payment Receipt Modal */}
+      <PaymentReceiptModal
+        order={selectedReceiptOrder}
+        isOpen={!!selectedReceiptOrder}
+        onClose={() => setSelectedReceiptOrder(null)}
+      />
     </div>
   );
 };

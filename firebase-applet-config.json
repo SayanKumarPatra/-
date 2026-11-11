@@ -1,9 +1,11 @@
 {
-  "projectId": "bcastudypoint-cdfdf",
-  "appId": "1:580615617868:web:64a76d387ba8af056763e9",
-  "apiKey": "AIzaSyDHOCOmhLXjQoJKjJ0JZfwXNufM68n6m5U",
-  "authDomain": "bcastudypoint-cdfdf.firebaseapp.com",
-  "storageBucket": "bcastudypoint-cdfdf.firebasestorage.app",
-  "messagingSenderId": "580615617868",
-  "measurementId": "G-29LW2QLVYZ"
+  "projectId": "tonal-sentinel-3cf5x",
+  "appId": "1:944855565990:web:f0449c5c294a7e4e739667",
+  "apiKey": "AIzaSyC1rYWKmhhjXhxseA0QoiO2ZBaYXJo0Z9U",
+  "authDomain": "tonal-sentinel-3cf5x.firebaseapp.com",
+  "storageBucket": "tonal-sentinel-3cf5x.firebasestorage.app",
+  "messagingSenderId": "944855565990",
+  "measurementId": "",
+  "oAuthClientId": "944855565990-cua06u67t59sbl1v96j64p68ps2a81ui.apps.googleusercontent.com",
+  "recaptchaSiteKey": ""
 }
