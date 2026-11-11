@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { db, PDF_STORAGE_DIR } from '../db';
 import { pdfService } from '../pdfService';
-import { requireAdmin, ADMIN_SECRET_KEY, type AuthenticatedRequest } from '../authMiddleware';
+import { requireAdmin, ADMIN_SECRET_KEY, isValidAdminKey, type AuthenticatedRequest } from '../authMiddleware';
 
 export const adminRouter = Router();
 
@@ -41,7 +41,8 @@ const upload = multer({
  */
 adminRouter.post('/login', (req, res) => {
   const { secretKey } = req.body;
-  if (secretKey === ADMIN_SECRET_KEY) {
+  if (isValidAdminKey(secretKey)) {
+    const activeKey = (typeof secretKey === 'string' && secretKey.trim()) || ADMIN_SECRET_KEY;
     db.logAdminAction({
       adminId: 'admin_session',
       action: 'ADMIN_LOGIN',
@@ -50,13 +51,13 @@ adminRouter.post('/login', (req, res) => {
     return res.json({
       success: true,
       message: 'Admin authenticated successfully',
-      adminKey: ADMIN_SECRET_KEY,
+      adminKey: activeKey,
     });
   }
   return res.status(401).json({
     success: false,
     error: 'INVALID_CREDENTIALS',
-    message: 'Incorrect Administrator secret key.',
+    message: 'ভুল Admin Secret Key দেওয়া হয়েছে। অনুগ্রহ করে সঠিক পাসওয়ার্ড দিন।',
   });
 });
 

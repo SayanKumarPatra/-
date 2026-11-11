@@ -369,6 +369,20 @@
   ],
   "adminAuditLogs": [
     {
+      "adminId": "admin_session",
+      "action": "ADMIN_LOGIN",
+      "details": "Administrator logged into management console.",
+      "id": "log-1794381228499-jx1b",
+      "timestamp": "2026-11-11T07:13:48.499Z"
+    },
+    {
+      "adminId": "admin_session",
+      "action": "ADMIN_LOGIN",
+      "details": "Administrator logged into management console.",
+      "id": "log-1794380954375-bgn7",
+      "timestamp": "2026-11-11T07:09:14.375Z"
+    },
+    {
       "adminId": "admin",
       "action": "APPROVE_ORDER",
       "targetId": "ORD-202611-63B905",
