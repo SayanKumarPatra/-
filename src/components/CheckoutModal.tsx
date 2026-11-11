@@ -18,6 +18,7 @@ import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { BRAND } from '../constants/brand';
 import { saveOrderRealtime } from '../firebase/firebase';
+import { CORE_SUBJECT_IDS, calculatePackagePrice } from '../constants/packageConfig';
 import type { Product } from '../types';
 
 interface CheckoutModalProps {
@@ -55,7 +56,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   if (!isOpen) return null;
 
-  const totalPayable = selectedProducts.reduce((sum, p) => sum + p.price, 0);
+  const packagePricing = calculatePackagePrice(selectedProducts.map((p) => p.id));
+  const totalPayable = packagePricing.launchOfferPrice;
 
   // Official Payment Details
   const OFFICIAL_UPI_ID = BRAND.payment?.upiId || 'BHARATPE2D0I0H4R5P81095@unitype';
@@ -275,30 +277,67 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
             )}
 
-            {/* Selected Subjects Pills */}
+            {/* Package Deal & Pricing Banner */}
+            <div className="bg-[#3D0009]/80 p-2.5 rounded-xl border border-[#FFE7A3]/30 flex items-center justify-between text-xs shadow-inner">
+              <div>
+                <span className="text-[10px] text-[#FFE7A3] uppercase font-black tracking-wider block">
+                  Package Deal ({packagePricing.totalPdfs} PDFs)
+                </span>
+                <span className="text-white font-black text-xs sm:text-sm">
+                  {packagePricing.combinationLabel}
+                </span>
+              </div>
+              <div className="text-right">
+                <div className="flex items-center gap-1.5 justify-end">
+                  <span className="line-through text-white/50 text-[11px]">
+                    ₹{packagePricing.regularPrice}
+                  </span>
+                  <span className="text-[#FFD34E] font-black text-base">
+                    ₹{totalPayable}
+                  </span>
+                </div>
+                <span className="text-[#FFD34E] font-bold text-[10px] bg-[#FFD34E]/15 px-1.5 py-0.5 rounded border border-[#FFD34E]/30">
+                  Save ₹{packagePricing.totalSavings}
+                </span>
+              </div>
+            </div>
+
+            {/* Selected Subjects List */}
             <div className="space-y-1">
-              <label className="text-[11px] font-bold text-white/80 block">Selected Subjects:</label>
+              <label className="text-[11px] font-bold text-white/80 block">Included Subjects:</label>
               <div className="max-h-28 overflow-y-auto space-y-1 bg-black/40 p-2 rounded-xl border border-white/10">
-                {selectedProducts.map((p) => (
-                  <div
-                    key={p.id}
-                    className="flex items-center justify-between text-xs py-1 px-1.5 border-b border-white/5 last:border-0"
-                  >
-                    <span className="font-semibold text-white truncate max-w-[220px]">
-                      {p.subjectCode}: {p.subjectName}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[#FFD34E] font-bold">₹{p.price}</span>
-                      <button
-                        type="button"
-                        onClick={() => onRemoveProduct(p.id)}
-                        className="text-white/40 hover:text-rose-400 cursor-pointer"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
+                {selectedProducts.map((p) => {
+                  const isCore = CORE_SUBJECT_IDS.includes(p.id as any);
+                  return (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between text-xs py-1 px-1.5 border-b border-white/5 last:border-0"
+                    >
+                      <span className="font-semibold text-white truncate max-w-[220px]">
+                        {p.subjectCode}: {p.subjectName}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {isCore ? (
+                          <span className="text-[#FFE7A3] text-[10px] font-black px-1.5 py-0.5 rounded bg-[#FFD34E]/15 border border-[#FFD34E]/30">
+                            Core Compulsory
+                          </span>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[#FFD34E] text-[10px] font-bold">Add-on</span>
+                            <button
+                              type="button"
+                              onClick={() => onRemoveProduct(p.id)}
+                              className="text-white/40 hover:text-rose-400 cursor-pointer p-0.5"
+                              title="Remove Optional Add-on"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 

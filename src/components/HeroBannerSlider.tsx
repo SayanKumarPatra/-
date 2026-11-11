@@ -12,21 +12,21 @@ export const HeroBannerSlider: React.FC<{ onExploreClick: () => void }> = ({ onE
   const slides: BannerSlide[] = [
     {
       id: 'banner-welcome',
-      title: 'Welcome to BCA STUDY POINT - Complete Exam Question Bank',
-      imageUrl: '/assets/aistudio/BCA_Study_Point_Exam_Prep_Banner_703b034c.png',
-      alt: 'Welcome to BCA STUDY POINT - Complete BCA Question Bank with Previous Year, Important & Probable Questions',
+      title: 'Welcome to BCA STUDY POINT - Your Complete Exam Preparation Partner',
+      imageUrl: '/assets/aistudio/Welcome_to_BCA_Study_Point_005ca426.png',
+      alt: 'Welcome to BCA STUDY POINT - Smart Study Materials for BCA Students: Notes, Question Bank, PYQ, Video Explanation, Practice Sets',
     },
     {
-      id: 'banner-subjects',
-      title: 'Explore Our BCA 3rd Sem Subjects',
-      imageUrl: '/assets/aistudio/BCA_Study_Point_Subjects_Banner_4b0de4c1.png',
-      alt: 'Explore Our BCA Subjects - Question Bank, Important Questions, PYQs',
+      id: 'banner-launch-offer',
+      title: 'Special Launch Offer - BCA 3rd Semester Complete Study Package at ₹99 Only',
+      imageUrl: '/assets/aistudio/BCA_3rd_Semester_Launch_Offer_b41d8881.png',
+      alt: 'Special Launch Offer - BCA 3rd Semester Complete Study Package at ₹99 Only (Regular ₹199) - Limited Time Offer',
     },
     {
-      id: 'banner-special-offer',
-      title: 'Special Offer - Get Your Desired Question Bank at Special Price',
-      imageUrl: '/assets/aistudio/BCA_Study_Point_Special_Offer_3cca2cdd.png',
-      alt: 'Special Offer - Limited Time Offer - Score Higher',
+      id: 'banner-benefits-policies',
+      title: 'Our Benefits & Policies - What You Get & How We Work',
+      imageUrl: '/assets/aistudio/BCA_Study_Point_Benefits___Policies_6c4db866.png',
+      alt: 'Our Benefits & Policies - Key Benefits and Policy Guidelines for BCA Students',
     },
   ];
 
@@ -98,7 +98,7 @@ export const HeroBannerSlider: React.FC<{ onExploreClick: () => void }> = ({ onE
       */}
       <div
         onClick={onExploreClick}
-        className="relative w-full h-[145px] sm:h-[185px] md:h-[225px] lg:h-[245px] rounded-2xl sm:rounded-3xl overflow-hidden border border-[#FFE7A3]/30 shadow-[0_10px_30px_rgba(0,0,0,0.65)] bg-black/70 cursor-pointer group"
+        className="relative w-full aspect-[3.2/1] min-h-[120px] sm:min-h-[175px] max-h-[310px] rounded-2xl sm:rounded-3xl overflow-hidden border border-[#FFE7A3]/30 shadow-[0_10px_30px_rgba(0,0,0,0.65)] bg-black/70 cursor-pointer group"
       >
         {/* Specular Rim Light */}
         <div className="absolute inset-x-6 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#FFE7A3]/60 to-transparent pointer-events-none z-10" />

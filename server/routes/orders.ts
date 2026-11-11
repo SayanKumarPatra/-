@@ -49,7 +49,7 @@ ordersRouter.post('/create-order', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Please select at least one question bank.' });
     }
 
-    // Server-side calculation from database prices ONLY
+    // Server-side calculation with Official Package Pricing integration
     const orderItems: OrderItem[] = [];
     let calculatedTotal = 0;
 
@@ -68,6 +68,24 @@ ordersRouter.post('/create-order', async (req, res) => {
         price: product.price,
       });
       calculatedTotal += product.price;
+    }
+
+    // Official BCA STUDY POINT Package Pricing Rules:
+    // Core (4 subjects): ₹69 | Language Add-on (+1): +₹10 | Specialization Add-on (+1): +₹20
+    const coreIds = ['prod-bca-maj3', 'prod-bca-min3', 'prod-bca-mdc3', 'prod-bca-sec3'];
+    const hasCorePackage = coreIds.every((cid) => selectedProductIds.includes(cid));
+
+    if (hasCorePackage) {
+      const langIds = ['prod-bca-aec3-bengali', 'prod-bca-aec3-sanskrit'];
+      const specIds = ['prod-spec-ds', 'prod-spec-ai', 'prod-spec-cs', 'prod-spec-ml', 'prod-spec-iot'];
+      const hasLang = selectedProductIds.some((id: string) => langIds.includes(id));
+      const hasSpec = selectedProductIds.some((id: string) => specIds.includes(id));
+
+      let pkgTotal = 69; // 4 Core Launch Price
+      if (hasLang) pkgTotal += 10; // +1 Language Add-on
+      if (hasSpec) pkgTotal += 20; // +1 Specialization Add-on
+
+      calculatedTotal = pkgTotal;
     }
 
     if (calculatedTotal <= 0) {

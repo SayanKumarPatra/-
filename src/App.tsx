@@ -7,8 +7,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navbar } from './components/Navbar';
 import { HeroBannerSlider } from './components/HeroBannerSlider';
-import { SemesterSelector } from './components/SemesterSelector';
-import { SubjectCatalog } from './components/SubjectCatalog';
 import { HowItWorks } from './components/HowItWorks';
 import { CheckoutModal } from './components/CheckoutModal';
 import { PurchasedContent } from './components/PurchasedContent';
@@ -19,6 +17,13 @@ import { AuthModal } from './components/AuthModal';
 import { AboutModal } from './components/AboutModal';
 import { ContactModal } from './components/ContactModal';
 import { MobileBottomNav } from './components/MobileBottomNav';
+import { PackagePricingSection } from './components/PackagePricingSection';
+import {
+  CORE_SUBJECT_IDS,
+  LANGUAGE_SUBJECT_IDS,
+  SPECIALIZATION_SUBJECT_IDS,
+  calculatePackagePrice,
+} from './constants/packageConfig';
 import { api } from './services/api';
 import { FALLBACK_PRODUCTS } from './constants/fallbackProducts';
 import { subscribeToProductsRealtime } from './firebase/firebase';
@@ -36,8 +41,8 @@ function AppContent() {
   const [isLoadingCatalog, setIsLoadingCatalog] = useState(false);
   const [catalogError, setCatalogError] = useState('');
 
-  // Cart & Selection State
-  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  // Cart & Selection State - Compulsory Core 4 subjects included by default
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([...CORE_SUBJECT_IDS]);
 
   // Purchased IDs set for current logged in student
   const [purchasedProductIds, setPurchasedProductIds] = useState<string[]>([]);
@@ -108,43 +113,45 @@ function AppContent() {
     }
   }, [student?.id]);
 
-  // Handle subject selection toggle
-  const handleToggleSelect = (productId: string) => {
-    if (purchasedProductIds.includes(productId)) {
-      setActiveViewerProductId(productId);
-      return;
-    }
+  // Handle optional Language selection (Max 1 or null)
+  const handleSelectLanguage = (langId: string | null) => {
+    setSelectedProductIds((prev) => {
+      const withoutLang = prev.filter((id) => !(LANGUAGE_SUBJECT_IDS as readonly string[]).includes(id));
+      const nextSet = new Set([...withoutLang, ...CORE_SUBJECT_IDS]);
+      if (langId) {
+        nextSet.add(langId);
+      }
+      return Array.from(nextSet);
+    });
+  };
 
-    setSelectedProductIds((prev) =>
-      prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId]
-    );
+  // Handle optional Specialization selection (Max 1 or null)
+  const handleSelectSpecialization = (specId: string | null) => {
+    setSelectedProductIds((prev) => {
+      const withoutSpec = prev.filter((id) => !(SPECIALIZATION_SUBJECT_IDS as readonly string[]).includes(id));
+      const nextSet = new Set([...withoutSpec, ...CORE_SUBJECT_IDS]);
+      if (specId) {
+        nextSet.add(specId);
+      }
+      return Array.from(nextSet);
+    });
   };
 
   const handleRemoveFromCart = (productId: string) => {
+    // Core subjects are compulsory and cannot be removed
+    if ((CORE_SUBJECT_IDS as readonly string[]).includes(productId as any)) return;
     setSelectedProductIds((prev) => prev.filter((id) => id !== productId));
   };
-
-  // Filtered products calculation
-  const coreCount = useMemo(() => products.filter((p) => p.paperType === 'core').length, [products]);
-  const specializationCount = useMemo(() => products.filter((p) => p.paperType === 'specialization').length, [products]);
-
-  const filteredProducts = useMemo(() => {
-    if (activeCategory === 'core') {
-      return products.filter((prod) => prod.paperType === 'core');
-    }
-    if (activeCategory === 'specialization') {
-      return products.filter((prod) => prod.paperType === 'specialization');
-    }
-    return products;
-  }, [products, activeCategory]);
 
   const selectedProducts = useMemo(() => {
     return products.filter((p) => selectedProductIds.includes(p.id));
   }, [products, selectedProductIds]);
 
-  const totalPrice = useMemo(() => {
-    return selectedProducts.reduce((sum, p) => sum + p.price, 0);
-  }, [selectedProducts]);
+  const packagePricing = useMemo(() => {
+    return calculatePackagePrice(selectedProductIds);
+  }, [selectedProductIds]);
+
+  const totalPrice = packagePricing.launchOfferPrice;
 
   // If Admin portal is open, render AdminPanel
   if (currentView === 'admin') {
@@ -225,39 +232,27 @@ function AppContent() {
           /* Public Storefront Layout Clean & Streamlined */
           <>
             {/* 2. Sliding Banner Carousel directly beneath the Navbar */}
+            {/* 2. Sliding Banner Carousel directly beneath the Navbar */}
             <div className="pt-2 px-2 sm:px-4">
               <HeroBannerSlider
                 onExploreClick={() => {
-                  document.getElementById('subjects')?.scrollIntoView({ behavior: 'smooth' });
+                  document.getElementById('packages-pricing')?.scrollIntoView({ behavior: 'smooth' });
                 }}
               />
             </div>
 
-            {/* 3. Category Filter: All Subjects, Core Papers, Specialization Pack */}
-            <SemesterSelector
-              activeCategory={activeCategory}
-              onSelectCategory={setActiveCategory}
-              coreCount={coreCount}
-              specializationCount={specializationCount}
-              totalCount={products.length}
-            />
-
-            {/* 4. Subject Cards Catalog (3 columns on mobile, textbook cover images, minimal text) */}
-            <SubjectCatalog
-              products={filteredProducts}
-              activeCategory={activeCategory}
+            {/* 3. BCA STUDY POINT – Package Selection & Pricing Section (Compulsory Core, Optional Language, Optional Specialization, Live Order Summary) */}
+            <PackagePricingSection
+              products={products}
               selectedProductIds={selectedProductIds}
               purchasedProductIds={purchasedProductIds}
-              totalPrice={totalPrice}
-              isLoading={isLoadingCatalog}
-              error={catalogError}
-              onRetry={loadCatalog}
-              onToggleSelect={handleToggleSelect}
-              onOpenViewer={(prodId) => setActiveViewerProductId(prodId)}
+              onSelectLanguage={handleSelectLanguage}
+              onSelectSpecialization={handleSelectSpecialization}
               onProceedToCheckout={() => setCurrentView('checkout')}
+              onOpenViewer={(prodId) => setActiveViewerProductId(prodId)}
             />
 
-            {/* 5. How It Works: Simple 1, 2, 3, 4 numbered points */}
+            {/* 4. How It Works: Simple 1, 2, 3, 4 numbered points */}
             <HowItWorks />
           </>
         )}
