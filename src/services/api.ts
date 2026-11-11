@@ -1,4 +1,5 @@
 import type { Semester, Product, Order, Purchase, DeviceBinding, AdminAuditLog } from '../types';
+import { FALLBACK_PRODUCTS } from '../constants/fallbackProducts';
 
 const ADMIN_STORAGE_KEY = 'bca_admin_auth_key';
 
@@ -14,40 +15,92 @@ export function setStoredAdminKey(key: string | null) {
   }
 }
 
-import { FALLBACK_PRODUCTS } from '../constants/fallbackProducts';
+/**
+ * Robust JSON fetch wrapper that guards against HTML responses, Cloud Run cold-start pages,
+ * and proxy errors (such as "The page cannot be found..."), preventing SyntaxError crashes.
+ */
+async function safeFetchJson<T = any>(
+  url: string,
+  options?: RequestInit,
+  fallback?: T
+): Promise<T> {
+  try {
+    const res = await fetch(url, options);
+    const contentType = res.headers.get('content-type') || '';
+
+    // If server returned non-JSON (e.g. HTML 404, 502, proxy warmup page)
+    if (!contentType.includes('application/json')) {
+      const text = await res.text();
+      console.warn(`[API] Expected JSON from ${url}, received non-JSON (${res.status}):`, text.slice(0, 100));
+
+      if (fallback !== undefined) {
+        return fallback;
+      }
+      throw new Error(`সার্ভার থেকে সঠিক তথ্য পাওয়া যায়নি (Status: ${res.status})। অনুগ্রহ করে পেজটি রিফ্রেশ করুন।`);
+    }
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || data.error || `Request failed with status ${res.status}`);
+    }
+    return data as T;
+  } catch (err: any) {
+    if (fallback !== undefined) {
+      console.warn(`[API] Using fallback for ${url}:`, err.message);
+      return fallback;
+    }
+    // Clean user-friendly message for any residual JSON syntax error
+    if (err.name === 'SyntaxError' || err.message?.includes('JSON') || err.message?.includes('Unexpected token')) {
+      throw new Error('সার্ভার সংযোগে সাময়িক সমস্যা হয়েছে। অনুগ্রহ করে পেজটি রিফ্রেশ করুন।');
+    }
+    throw err;
+  }
+}
 
 export const api = {
   // --- Public Storefront ---
   async getSemesters(): Promise<{ semesters: Semester[] }> {
-    try {
-      const res = await fetch('/api/semesters');
-      if (!res.ok) throw new Error('Failed to load semesters');
-      return await res.json();
-    } catch {
-      return { semesters: [{ id: 'sem-3', semesterNumber: 3, title: 'BCA Semester 3', academicYear: 'Year 2', description: 'Core and Specialization Question Banks', published: true, createdAt: '', updatedAt: '' }] };
-    }
+    return safeFetchJson(
+      '/api/semesters',
+      undefined,
+      {
+        semesters: [
+          {
+            id: 'sem-3',
+            semesterNumber: 3,
+            title: 'BCA Semester 3',
+            academicYear: 'Year 2',
+            description: 'Core and Specialization Question Banks',
+            published: true,
+            createdAt: '',
+            updatedAt: '',
+          },
+        ],
+      }
+    );
   },
 
   async getProducts(semesterId?: string): Promise<{ products: Product[] }> {
-    try {
-      const url = semesterId ? `/api/products?semesterId=${encodeURIComponent(semesterId)}` : '/api/products';
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('Failed to load subjects');
-      const data = await res.json();
-      if (data.products && data.products.length > 0) {
-        return data;
-      }
-      return { products: FALLBACK_PRODUCTS };
-    } catch {
-      // Graceful fallback to all 11 BCA 3rd Sem products for static/Vercel/offline deployments
-      return { products: FALLBACK_PRODUCTS };
+    const url = semesterId ? `/api/products?semesterId=${encodeURIComponent(semesterId)}` : '/api/products';
+    const result = await safeFetchJson<{ products: Product[] }>(
+      url,
+      undefined,
+      { products: FALLBACK_PRODUCTS }
+    );
+
+    if (result?.products && result.products.length > 0) {
+      return result;
     }
+    return { products: FALLBACK_PRODUCTS };
   },
 
   async getProduct(id: string): Promise<{ product: Product }> {
-    const res = await fetch(`/api/products/${encodeURIComponent(id)}`);
-    if (!res.ok) throw new Error('Subject question bank not found');
-    return res.json();
+    const fallback = FALLBACK_PRODUCTS.find((p) => p.id === id) || FALLBACK_PRODUCTS[0];
+    return safeFetchJson(
+      `/api/products/${encodeURIComponent(id)}`,
+      undefined,
+      { product: fallback }
+    );
   },
 
   // --- Checkout & Payments ---
@@ -75,16 +128,11 @@ export const api = {
     };
     error?: string;
   }> {
-    const res = await fetch('/api/checkout/create-order', {
+    return safeFetchJson('/api/checkout/create-order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      throw new Error(data.error || 'Failed to initiate checkout order');
-    }
-    return data;
   },
 
   async verifyPayment(payload: {
@@ -101,16 +149,11 @@ export const api = {
     totalAmount: number;
     error?: string;
   }> {
-    const res = await fetch('/api/checkout/verify-payment', {
+    return safeFetchJson('/api/checkout/verify-payment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      throw new Error(data.message || data.error || 'Payment verification failed');
-    }
-    return data;
   },
 
   // --- Student Purchased Content ---
@@ -129,9 +172,33 @@ export const api = {
       examYear: string;
     }>;
   }> {
-    const res = await fetch(`/api/orders/user/${encodeURIComponent(userId)}`);
-    if (!res.ok) throw new Error('Failed to load purchased question banks');
-    return res.json();
+    return safeFetchJson(
+      `/api/orders/user/${encodeURIComponent(userId)}`,
+      undefined,
+      { orders: [], purchases: [] }
+    );
+  },
+
+  // --- Student Authentication ---
+  async studentRegister(payload: {
+    fullName: string;
+    email: string;
+    mobile: string;
+    collegeName?: string;
+  }): Promise<{ success: boolean; student: any; error?: string; message?: string }> {
+    return safeFetchJson('/api/auth/student-register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async studentLogin(identifier: string): Promise<{ success: boolean; student: any; error?: string; message?: string }> {
+    return safeFetchJson('/api/auth/student-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier }),
+    });
   },
 
   // --- Secure PDF Viewer ---
@@ -151,54 +218,32 @@ export const api = {
     registeredDevice?: any;
     supportInfo?: any;
   }> {
-    const res = await fetch('/api/viewer/session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      return data;
+    try {
+      const res = await fetch('/api/viewer/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        return {
+          success: false,
+          error: 'SERVER_UNAVAILABLE',
+          message: 'সার্ভার সংযোগে সমস্যা হয়েছে। অনুগ্রহ করে পেজটি রিফ্রেশ করে পুনরায় চেষ্টা করুন।',
+        };
+      }
+      return await res.json();
+    } catch (err: any) {
+      return {
+        success: false,
+        error: 'NETWORK_ERROR',
+        message: err.message || 'Failed to authenticate secure session',
+      };
     }
-    return data;
-  },
-
-  // --- Student Authentication ---
-  async studentRegister(payload: {
-    fullName: string;
-    email: string;
-    mobile: string;
-    collegeName?: string;
-  }): Promise<{ success: boolean; student: any; error?: string; message?: string }> {
-    const res = await fetch('/api/auth/student-register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      throw new Error(data.message || data.error || 'Registration failed');
-    }
-    return data;
-  },
-
-  async studentLogin(identifier: string): Promise<{ success: boolean; student: any; error?: string; message?: string }> {
-    const res = await fetch('/api/auth/student-login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier }),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      throw new Error(data.message || data.error || 'Student account not found');
-    }
-    return data;
   },
 
   async getViewerManifest(sessionToken: string) {
-    const res = await fetch(`/api/viewer/manifest?token=${encodeURIComponent(sessionToken)}`);
-    if (!res.ok) throw new Error('Session expired or document unavailable');
-    return res.json();
+    return safeFetchJson(`/api/viewer/manifest?token=${encodeURIComponent(sessionToken)}`);
   },
 
   getViewerPageUrl(sessionToken: string, pageNumber: number): string {
@@ -211,16 +256,11 @@ export const api = {
 
   // --- Admin API ---
   async adminLogin(secretKey: string): Promise<{ success: boolean; adminKey: string }> {
-    const res = await fetch('/api/admin/login', {
+    return safeFetchJson('/api/admin/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ secretKey }),
     });
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      throw new Error(data.message || 'Invalid administrator secret key');
-    }
-    return data;
   },
 
   async getAdminStats(): Promise<{
@@ -237,16 +277,14 @@ export const api = {
     recentLogs: AdminAuditLog[];
   }> {
     const adminKey = getStoredAdminKey();
-    const res = await fetch('/api/admin/stats', {
+    return safeFetchJson('/api/admin/stats', {
       headers: { 'x-admin-key': adminKey || '' },
     });
-    if (!res.ok) throw new Error('Unauthorized or failed to load admin statistics');
-    return res.json();
   },
 
   async createSemester(data: any): Promise<{ semester: Semester }> {
     const adminKey = getStoredAdminKey();
-    const res = await fetch('/api/admin/semesters', {
+    return safeFetchJson('/api/admin/semesters', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -254,13 +292,11 @@ export const api = {
       },
       body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error('Failed to create semester');
-    return res.json();
   },
 
   async updateSemester(id: string, data: any): Promise<{ semester: Semester }> {
     const adminKey = getStoredAdminKey();
-    const res = await fetch(`/api/admin/semesters/${encodeURIComponent(id)}`, {
+    return safeFetchJson(`/api/admin/semesters/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -268,41 +304,33 @@ export const api = {
       },
       body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error('Failed to update semester');
-    return res.json();
   },
 
   async createProductWithPdf(formData: FormData): Promise<{ product: Product }> {
     const adminKey = getStoredAdminKey();
-    const res = await fetch('/api/admin/products', {
+    return safeFetchJson('/api/admin/products', {
       method: 'POST',
       headers: {
         'x-admin-key': adminKey || '',
       },
       body: formData,
     });
-    const data = await res.json();
-    if (!res.ok || !data.success) throw new Error(data.error || 'Failed to upload and create subject');
-    return data;
   },
 
   async updateProductWithPdf(id: string, formData: FormData): Promise<{ product: Product }> {
     const adminKey = getStoredAdminKey();
-    const res = await fetch(`/api/admin/products/${encodeURIComponent(id)}`, {
+    return safeFetchJson(`/api/admin/products/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: {
         'x-admin-key': adminKey || '',
       },
       body: formData,
     });
-    const data = await res.json();
-    if (!res.ok || !data.success) throw new Error(data.error || 'Failed to update subject');
-    return data;
   },
 
   async updateProduct(id: string, updates: Partial<Product>): Promise<{ product: Product }> {
     const adminKey = getStoredAdminKey();
-    const res = await fetch(`/api/admin/products/${encodeURIComponent(id)}`, {
+    return safeFetchJson(`/api/admin/products/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -310,9 +338,6 @@ export const api = {
       },
       body: JSON.stringify(updates),
     });
-    const data = await res.json();
-    if (!res.ok || !data.success) throw new Error(data.error || 'Failed to update subject');
-    return data;
   },
 
   async deleteProduct(id: string): Promise<void> {
@@ -328,30 +353,27 @@ export const api = {
 
   async getAdminOrders(): Promise<{ orders: Order[] }> {
     const adminKey = getStoredAdminKey();
-    const res = await fetch('/api/admin/orders', {
-      headers: { 'x-admin-key': adminKey || '' },
-    });
-    if (!res.ok) throw new Error('Failed to fetch orders');
-    return res.json();
+    return safeFetchJson(
+      '/api/admin/orders',
+      { headers: { 'x-admin-key': adminKey || '' } },
+      { orders: [] }
+    );
   },
 
   async approveOrder(orderId: string): Promise<{ success: boolean; message: string; order: Order }> {
     const adminKey = getStoredAdminKey();
-    const res = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/approve`, {
+    return safeFetchJson(`/api/admin/orders/${encodeURIComponent(orderId)}/approve`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-admin-key': adminKey || '',
       },
     });
-    const data = await res.json();
-    if (!res.ok || !data.success) throw new Error(data.error || 'Failed to approve order');
-    return data;
   },
 
   async rejectOrder(orderId: string, reason?: string): Promise<{ success: boolean; message: string; order: Order }> {
     const adminKey = getStoredAdminKey();
-    const res = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/reject`, {
+    return safeFetchJson(`/api/admin/orders/${encodeURIComponent(orderId)}/reject`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -359,23 +381,20 @@ export const api = {
       },
       body: JSON.stringify({ reason }),
     });
-    const data = await res.json();
-    if (!res.ok || !data.success) throw new Error(data.error || 'Failed to reject order');
-    return data;
   },
 
   async getAdminDevices(): Promise<{ devices: DeviceBinding[] }> {
     const adminKey = getStoredAdminKey();
-    const res = await fetch('/api/admin/devices', {
-      headers: { 'x-admin-key': adminKey || '' },
-    });
-    if (!res.ok) throw new Error('Failed to fetch registered devices');
-    return res.json();
+    return safeFetchJson(
+      '/api/admin/devices',
+      { headers: { 'x-admin-key': adminKey || '' } },
+      { devices: [] }
+    );
   },
 
   async resetDevice(userId: string, reason: string): Promise<{ success: boolean; message: string }> {
     const adminKey = getStoredAdminKey();
-    const res = await fetch('/api/admin/devices/reset', {
+    return safeFetchJson('/api/admin/devices/reset', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -383,31 +402,25 @@ export const api = {
       },
       body: JSON.stringify({ userId, reason }),
     });
-    const data = await res.json();
-    if (!res.ok || !data.success) throw new Error(data.error || 'Failed to reset device binding');
-    return data;
   },
 
   async getAdminAuditLogs(): Promise<{ logs: AdminAuditLog[] }> {
     const adminKey = getStoredAdminKey();
-    const res = await fetch('/api/admin/audit-logs', {
-      headers: { 'x-admin-key': adminKey || '' },
-    });
-    if (!res.ok) throw new Error('Failed to fetch audit logs');
-    return res.json();
+    return safeFetchJson(
+      '/api/admin/audit-logs',
+      { headers: { 'x-admin-key': adminKey || '' } },
+      { logs: [] }
+    );
   },
 
   async clearTestData(): Promise<{ success: boolean; message: string }> {
     const adminKey = getStoredAdminKey();
-    const res = await fetch('/api/admin/clear-test-data', {
+    return safeFetchJson('/api/admin/clear-test-data', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-admin-key': adminKey || '',
       },
     });
-    const data = await res.json();
-    if (!res.ok || !data.success) throw new Error(data.error || 'Failed to clear test data');
-    return data;
   },
 };

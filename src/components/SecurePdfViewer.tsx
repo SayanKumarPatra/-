@@ -268,8 +268,17 @@ export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
       const docUrl = api.getViewerDocumentUrl(token);
       const res = await fetch(docUrl);
       if (!res.ok) {
-        const errJson = await res.json().catch(() => null);
-        throw new Error(errJson?.message || 'Failed to download secure question bank');
+        let errMsg = 'Failed to download secure question bank';
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          try {
+            const errJson = await res.json();
+            errMsg = errJson.message || errJson.error || errMsg;
+          } catch {
+            // ignore
+          }
+        }
+        throw new Error(errMsg);
       }
 
       const arrayBuffer = await res.arrayBuffer();
