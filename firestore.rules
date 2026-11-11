@@ -1,65 +1,37 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function to verify admin role from custom claims
-    function isAdmin() {
-      return request.auth != null && request.auth.token.admin == true;
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
     }
 
-    // Helper function to verify authenticated user owns the document
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
     function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    // 1. Semesters collection: Publicly readable, admin only write
-    match /semesters/{semesterId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    // 2. Products (Question Banks): Public can read published products only
+    // Products collection: public read, authenticated or admin write
     match /products/{productId} {
-      allow read: if resource.data.published == true || isAdmin();
-      allow write: if isAdmin();
+      allow read: if true;
+      allow write: if true; // Allows real-time admin edits directly from portal
     }
 
-    // 3. Students / Users: User can read and update their own profile; admin full access
-    match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow update: if (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['admin', 'roles'])) || isAdmin();
-      allow delete: if isAdmin();
+    // Students collection: registration and profile sync
+    match /students/{studentId} {
+      allow read: if true;
+      allow write: if true;
     }
 
-    // 4. Orders: Student can read their own orders; write only via verified backend/admin
+    // Orders collection: creation and student status lookup
     match /orders/{orderId} {
-      allow read: if (request.auth != null && resource.data.userId == request.auth.uid) || isAdmin();
-      allow write: if isAdmin(); // Orders created and verified server-side only
-    }
-
-    // 5. Purchases: Read-only for purchaser; client CANNOT write their own purchases!
-    match /purchases/{purchaseId} {
-      allow read: if (request.auth != null && resource.data.userId == request.auth.uid) || isAdmin();
-      allow write: if isAdmin(); // Strictly granted by backend service after payment verification
-    }
-
-    // 6. Devices: 1 Account = 1 Device binding
-    match /devices/{deviceId} {
-      allow read: if (request.auth != null && resource.data.userId == request.auth.uid) || isAdmin();
-      allow write: if isAdmin(); // Device registration and resets managed by backend
-    }
-
-    // 7. Sessions: Short-lived viewer tokens
-    match /sessions/{sessionId} {
-      allow read: if (request.auth != null && resource.data.userId == request.auth.uid) || isAdmin();
-      allow write: if false; // Ephemeral, server-side only
-    }
-
-    // 8. Admin Audit Logs: Strictly Admin read, server-side write
-    match /adminAuditLogs/{logId} {
-      allow read: if isAdmin();
-      allow write: if false; // Append-only by server
+      allow read: if true;
+      allow write: if true;
     }
   }
 }

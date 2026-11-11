@@ -264,6 +264,21 @@ export const api = {
     return data;
   },
 
+  async updateProduct(id: string, updates: Partial<Product>): Promise<{ product: Product }> {
+    const adminKey = getStoredAdminKey();
+    const res = await fetch(`/api/admin/products/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-key': adminKey || '',
+      },
+      body: JSON.stringify(updates),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || 'Failed to update subject');
+    return data;
+  },
+
   async deleteProduct(id: string): Promise<void> {
     const adminKey = getStoredAdminKey();
     const res = await fetch(`/api/admin/products/${encodeURIComponent(id)}`, {
@@ -315,5 +330,19 @@ export const api = {
     });
     if (!res.ok) throw new Error('Failed to fetch audit logs');
     return res.json();
+  },
+
+  async clearTestData(): Promise<{ success: boolean; message: string }> {
+    const adminKey = getStoredAdminKey();
+    const res = await fetch('/api/admin/clear-test-data', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-key': adminKey || '',
+      },
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || 'Failed to clear test data');
+    return data;
   },
 };

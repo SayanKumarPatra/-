@@ -1,6 +1,8 @@
+import path from 'path';
+import fs from 'fs';
 import { Router } from 'express';
 import crypto from 'crypto';
-import { db } from '../db';
+import { db, PDF_STORAGE_DIR } from '../db';
 import { pdfService } from '../pdfService';
 import { hashDeviceToken } from '../authMiddleware';
 import type { ViewerSession } from '../../src/types';
@@ -148,9 +150,9 @@ viewerRouter.post('/session', (req, res) => {
 
 /**
  * GET /api/viewer/manifest
- * Returns document metadata and page count using valid session token
+ * Returns document metadata and verified page count using valid session token
  */
-viewerRouter.get('/manifest', (req, res) => {
+viewerRouter.get('/manifest', async (req, res) => {
   try {
     const token = req.query.token as string;
     if (!token) {
@@ -171,13 +173,31 @@ viewerRouter.get('/manifest', (req, res) => {
       return res.status(404).json({ success: false, error: 'Product not found' });
     }
 
+    // Inspect actual physical PDF page count from private storage
+    const fullPath = path.join(PDF_STORAGE_DIR, path.basename(product.privateStoragePath));
+    let verifiedPageCount = product.pageCount || 1;
+    if (fs.existsSync(fullPath)) {
+      try {
+        const actualCount = await pdfService.inspectPdfPageCount(fullPath);
+        if (actualCount > 0) {
+          verifiedPageCount = actualCount;
+          if (product.pageCount !== actualCount) {
+            product.pageCount = actualCount;
+            db.updateProduct(product.id, { pageCount: actualCount });
+          }
+        }
+      } catch (err) {
+        console.warn('Could not inspect PDF page count for product', product.id, err);
+      }
+    }
+
     res.json({
       success: true,
       manifest: {
         subjectCode: product.subjectCode,
         subjectName: product.subjectName,
         examYear: product.examYear,
-        pageCount: product.pageCount,
+        pageCount: verifiedPageCount,
         watermark: {
           studentName: session.studentName,
           studentEmail: session.studentEmail,
@@ -222,8 +242,30 @@ viewerRouter.get('/page', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Document not found' });
     }
 
+    const fullPath = path.join(PDF_STORAGE_DIR, path.basename(product.privateStoragePath));
+    if (!fs.existsSync(fullPath)) {
+      return res.status(404).json({
+        success: false,
+        error: 'FILE_NOT_FOUND',
+        message: 'PDF document not found in private storage',
+      });
+    }
+
+    const totalPages = await pdfService.inspectPdfPageCount(fullPath);
+
+    // If requested page is out of range, return clean 404 with totalPages header
+    if (pageNumber < 1 || pageNumber > totalPages) {
+      res.setHeader('X-Total-Pages', totalPages);
+      return res.status(404).json({
+        success: false,
+        error: 'PAGE_OUT_OF_RANGE',
+        message: `Page ${pageNumber} out of range (1 - ${totalPages})`,
+        totalPages,
+      });
+    }
+
     // Generate watermarked page PDF on-the-fly
-    const { pdfBytes, totalPages } = await pdfService.getWatermarkedPagePdf({
+    const { pdfBytes } = await pdfService.getWatermarkedPagePdf({
       privateStoragePath: product.privateStoragePath,
       pageNumber,
       studentName: session.studentName,

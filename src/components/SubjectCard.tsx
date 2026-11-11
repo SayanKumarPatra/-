@@ -49,13 +49,17 @@ export const SubjectCard: React.FC<SubjectCardProps> = ({
       <div className="absolute inset-x-2 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/40 to-transparent pointer-events-none" />
 
       {/* Book Cover Image Container (Portrait 3:4 Book Ratio) */}
-      <div className="w-full aspect-[3/4] rounded-lg sm:rounded-xl overflow-hidden mb-1.5 relative shadow-md bg-gradient-to-br from-[#850012] via-[#52000a] to-[#200004] border border-white/20 flex flex-col items-center justify-between p-1.5 sm:p-2 group-hover:border-[#FFD34E]/60 transition-colors">
-        {product.coverImageUrl ? (
+      <div className="w-full aspect-[3/4] rounded-lg sm:rounded-xl overflow-hidden mb-1.5 relative shadow-md bg-gradient-to-br from-[#850012]/40 via-[#52000a]/40 to-[#200004]/60 border border-white/20 flex flex-col items-center justify-center p-0.5 sm:p-1 group-hover:border-[#FFD34E]/60 transition-colors">
+        {product.coverImageUrl || product.imageUrl ? (
           <img
-            src={product.coverImageUrl}
+            src={product.coverImageUrl || product.imageUrl}
             alt={product.subjectName}
-            className="w-full h-full object-cover rounded-md"
+            className="w-full h-full object-contain filter drop-shadow-[0_6px_14px_rgba(0,0,0,0.55)] transition-transform duration-300 group-hover:scale-105"
             loading="lazy"
+            onError={(e) => {
+              // Hide broken image and fallback to styled emblem
+              (e.target as HTMLElement).style.display = 'none';
+            }}
           />
         ) : (
           <>

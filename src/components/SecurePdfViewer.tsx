@@ -125,6 +125,14 @@ export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
         const pageUrl = api.getViewerPageUrl(sessionToken, pageNumber);
         const res = await fetch(pageUrl);
         if (!res.ok) {
+          if (res.status === 404) {
+            // Out of range: safely trim page list to valid pages
+            setPages((prev) => prev.filter((p) => p.pageNumber < pageNumber));
+            setManifest((prev: any) =>
+              prev ? { ...prev, pageCount: Math.min(prev.pageCount, pageNumber - 1) } : null
+            );
+            return;
+          }
           throw new Error(`Failed to load page ${pageNumber}`);
         }
         const blob = await res.blob();

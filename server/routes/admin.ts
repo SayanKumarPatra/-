@@ -341,3 +341,16 @@ adminRouter.get('/audit-logs', requireAdmin, (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+adminRouter.post('/clear-test-data', requireAdmin, (req, res) => {
+  try {
+    db.clearOrdersAndStudentData('admin');
+    res.json({
+      success: true,
+      message: 'All test orders, student profiles, purchases, and device bindings have been cleared successfully.',
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+

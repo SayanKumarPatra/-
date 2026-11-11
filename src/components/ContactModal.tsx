@@ -77,6 +77,21 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
             </span>
           </a>
 
+          {/* Official BharatPe UPI ID */}
+          <div className="p-3 bg-black/40 rounded-2xl border border-white/15 flex items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-blue-500/20 border border-blue-400/40 flex items-center justify-center text-blue-400 shrink-0">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="font-extrabold text-white text-[11px] block">Official BharatPe UPI</span>
+                <span className="text-[11px] text-[#FFD34E] font-mono font-bold block truncate">
+                  {BRAND.payment?.upiId || 'BHARATPE2D0I0H4R5P81095@unitype'}
+                </span>
+              </div>
+            </div>
+          </div>
+
           {/* Activation Notice (10-20 minutes) */}
           <div className="p-3 bg-gradient-to-r from-[#970014]/60 to-[#65000D]/70 rounded-2xl border border-[#FFD34E]/30 flex items-start gap-2.5 text-[11px] text-white">
             <Clock className="w-4 h-4 text-[#FFD34E] shrink-0 mt-0.5" />

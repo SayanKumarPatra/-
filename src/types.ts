@@ -28,6 +28,7 @@ export interface Product {
   published: boolean;
   examYear: string; // e.g. "2024-2025 Edition"
   coverImageUrl?: string;
+  imageUrl?: string;
   paperType?: 'core' | 'specialization';
   createdAt: string;
   updatedAt: string;

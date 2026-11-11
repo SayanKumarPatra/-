@@ -54,9 +54,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const totalPayable = selectedProducts.reduce((sum, p) => sum + p.price, 0);
 
   // Official Payment Details
-  const OFFICIAL_UPI_ID = '8145775413@ybl';
-  const PRIMARY_PHONE = '8145775413';
-  const WHATSAPP_PHONE = '9382040746';
+  const OFFICIAL_UPI_ID = BRAND.payment?.upiId || 'BHARATPE2D0I0H4R5P81095@unitype';
+  const OFFICIAL_QR_CODE = BRAND.payment?.qrCodeUrl || '/assets/aistudio/WhatsApp_Image_2026-11-10_at_7.58.34_PM_43197c9f.jpeg';
+  const PRIMARY_PHONE = BRAND.payment?.primaryPhone || '8145775413';
+  const WHATSAPP_PHONE = BRAND.payment?.whatsappPhone || '9382040746';
 
   const handleCopyUpi = () => {
     try {
@@ -301,26 +302,33 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
             {/* Direct QR Code Card */}
             <div className="p-3 bg-black/50 rounded-2xl border border-[#FFD34E]/40 flex flex-col items-center text-center">
-              <div className="w-40 h-40 sm:w-44 sm:h-44 bg-white p-2 rounded-xl shadow-md mb-2 flex items-center justify-center">
+              <div className="mb-2 px-2.5 py-0.5 rounded-full bg-[#FFD34E]/20 border border-[#FFD34E]/50 text-[10px] font-bold text-[#FFD34E] flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3 text-[#FFD34E]" />
+                <span>Official BharatPe Merchant QR</span>
+              </div>
+
+              <div className="w-44 h-44 sm:w-48 sm:h-48 bg-white p-2 rounded-2xl shadow-xl mb-2 flex items-center justify-center border-2 border-[#FFD34E]/60 overflow-hidden">
                 <img
-                  src={qrCodeUrl}
-                  alt="BharatPe UPI QR Code"
-                  className="w-full h-full object-contain"
+                  src={OFFICIAL_QR_CODE}
+                  alt="Official BharatPe UPI QR Code"
+                  className="w-full h-full object-contain rounded-lg"
                 />
               </div>
 
-              <span className="text-[11px] text-white/70">
+              <span className="text-[11px] text-white/80 font-medium">
                 Scan with any UPI App (GPay / PhonePe / Paytm / BHIM)
               </span>
 
               {/* UPI ID Pill with 1-click Copy */}
-              <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-black/60 border border-[#FFE7A3]/30 rounded-full">
-                <span className="text-[11px] text-white/60">UPI ID:</span>
-                <span className="text-xs font-mono font-bold text-[#FFD34E]">{OFFICIAL_UPI_ID}</span>
+              <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-black/60 border border-[#FFE7A3]/40 rounded-full shadow-inner max-w-full">
+                <span className="text-[10px] sm:text-[11px] text-white/60">UPI ID:</span>
+                <span className="text-[11px] sm:text-xs font-mono font-bold text-[#FFD34E] truncate">
+                  {OFFICIAL_UPI_ID}
+                </span>
                 <button
                   type="button"
                   onClick={handleCopyUpi}
-                  className="p-1 text-white hover:text-[#FFD34E] cursor-pointer"
+                  className="p-1 text-white hover:text-[#FFD34E] cursor-pointer shrink-0"
                   title="Copy UPI ID"
                 >
                   {copiedUpi ? (

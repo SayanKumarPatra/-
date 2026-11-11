@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { getOrCreateDeviceToken, type DeviceInfo } from '../services/deviceFingerprint';
 import type { Student } from '../types';
+import { auth, syncStudentProfileRealtime, subscribeToStudentProfile } from '../firebase/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 interface AuthContextType {
   student: Student | null;
@@ -30,6 +32,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Keep device token refreshed
     setDeviceInfo(getOrCreateDeviceToken());
+
+    // Listen to Firebase Auth state
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        // If logged in via Firebase Auth, ensure student profile is active
+        setStudent((prev) => {
+          if (prev && prev.id === firebaseUser.uid) return prev;
+          const userStudent: Student = {
+            id: firebaseUser.uid,
+            email: firebaseUser.email || '',
+            fullName: firebaseUser.displayName || prev?.fullName || 'BCA Scholar',
+            mobile: prev?.mobile || '',
+            collegeName: prev?.collegeName,
+            studentId: prev?.studentId,
+            registeredAt: prev?.registeredAt || new Date().toISOString(),
+            lastLoginAt: new Date().toISOString(),
+          };
+          localStorage.setItem(STUDENT_STORAGE_KEY, JSON.stringify(userStudent));
+          // Real-time sync to Firestore
+          syncStudentProfileRealtime(userStudent);
+          return userStudent;
+        });
+      }
+    });
+
+    return () => {
+      unsubscribeAuth();
+    };
   }, []);
 
   const loginStudent = (data: Partial<Student>) => {
@@ -45,11 +75,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     setStudent(updated);
     localStorage.setItem(STUDENT_STORAGE_KEY, JSON.stringify(updated));
+
+    // Real-time sync to Firebase Firestore
+    syncStudentProfileRealtime(updated).catch((err) => {
+      console.warn('Realtime Firebase sync note:', err);
+    });
   };
 
   const logout = () => {
     setStudent(null);
     localStorage.removeItem(STUDENT_STORAGE_KEY);
+    auth.signOut().catch(() => {});
   };
 
   const refreshDevice = () => {

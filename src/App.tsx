@@ -22,6 +22,7 @@ import { MobileBottomNav } from './components/MobileBottomNav';
 import { Footer } from './components/Footer';
 import { api } from './services/api';
 import { FALLBACK_PRODUCTS } from './constants/fallbackProducts';
+import { subscribeToProductsRealtime } from './firebase/firebase';
 import type { Product } from './types';
 
 function AppContent() {
@@ -54,24 +55,39 @@ function AppContent() {
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
 
-  // Load catalog on mount
-  const loadCatalog = async () => {
+  const loadCatalog = () => {
     setIsLoadingCatalog(true);
     setCatalogError('');
-    try {
-      const prodRes = await api.getProducts();
-      if (prodRes?.products && prodRes.products.length > 0) {
-        setProducts(prodRes.products);
-      }
-    } catch (err: any) {
-      console.warn('Using offline BCA products fallback:', err);
-    } finally {
-      setIsLoadingCatalog(false);
-    }
+    api.getProducts()
+      .then((res) => {
+        if (res?.products?.length > 0) {
+          setProducts(res.products);
+        }
+      })
+      .catch((err) => {
+        console.warn('API products fallback:', err);
+        setCatalogError('Failed to load products. Please try again.');
+      })
+      .finally(() => {
+        setIsLoadingCatalog(false);
+      });
   };
 
+  // Load catalog & real-time Firebase Firestore listener
   useEffect(() => {
     loadCatalog();
+
+    // Real-time Firestore subscription: instantly updates whenever admin edits price or image
+    const unsubscribe = subscribeToProductsRealtime((realtimeProducts) => {
+      if (realtimeProducts && realtimeProducts.length > 0) {
+        setProducts(realtimeProducts);
+        setIsLoadingCatalog(false);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   // Sync student purchases when logged in

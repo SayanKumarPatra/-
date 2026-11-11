@@ -32,6 +32,11 @@ export class PdfService {
       if (!fs.existsSync(fullPath)) {
         console.log(`Generating seed PDF question bank for ${product.subjectCode}...`);
         await this.generateSampleQuestionBankPdf(product, fullPath);
+      } else {
+        const actualCount = await this.inspectPdfPageCount(fullPath);
+        if (product.pageCount !== actualCount && actualCount > 0) {
+          db.updateProduct(product.id, { pageCount: actualCount });
+        }
       }
     }
   }
@@ -211,13 +216,12 @@ export class PdfService {
     const sourceDoc = await PDFDocument.load(sourceBytes);
     const totalPages = sourceDoc.getPageCount();
 
-    if (params.pageNumber < 1 || params.pageNumber > totalPages) {
-      throw new Error(`Page ${params.pageNumber} out of range (1 - ${totalPages})`);
-    }
+    // Safely clamp requested page into legitimate bounds [1, totalPages]
+    const safePageNumber = Math.max(1, Math.min(params.pageNumber, totalPages));
 
     // Create a new single-page document for maximum security
     const pageDoc = await PDFDocument.create();
-    const [copiedPage] = await pageDoc.copyPages(sourceDoc, [params.pageNumber - 1]);
+    const [copiedPage] = await pageDoc.copyPages(sourceDoc, [safePageNumber - 1]);
     pageDoc.addPage(copiedPage);
 
     const helveticaBold = await pageDoc.embedFont(StandardFonts.HelveticaBold);

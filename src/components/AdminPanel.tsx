@@ -15,9 +15,13 @@ import {
   AlertCircle,
   CheckCircle2,
   ArrowLeft,
+  Edit3,
+  Image,
+  X,
 } from 'lucide-react';
 import { api, getStoredAdminKey, setStoredAdminKey } from '../services/api';
 import { BRAND } from '../constants/brand';
+import { updateProductRealtime, syncAllOfficialProductsToFirestore } from '../firebase/firebase';
 import type { Semester, Product, Order, DeviceBinding, AdminAuditLog } from '../types';
 
 export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
@@ -61,6 +65,112 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
 
   // Search filter
   const [searchFilter, setSearchFilter] = useState('');
+
+  // Real-time Product Edit Modal State
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editPrice, setEditPrice] = useState<number>(99);
+  const [editOriginalPrice, setEditOriginalPrice] = useState<number>(199);
+  const [editImageUrl, setEditImageUrl] = useState<string>('');
+  const [editSubjectName, setEditSubjectName] = useState<string>('');
+  const [editSubjectCode, setEditSubjectCode] = useState<string>('');
+  const [editDescription, setEditDescription] = useState<string>('');
+  const [isSavingEdit, setIsSavingEdit] = useState<boolean>(false);
+  const [editError, setEditError] = useState<string>('');
+
+  const handleOpenEditProduct = (prod: Product) => {
+    setEditingProduct(prod);
+    setEditPrice(prod.price);
+    setEditOriginalPrice(prod.originalPrice || Math.round(prod.price * 2));
+    setEditImageUrl(prod.coverImageUrl || prod.imageUrl || '');
+    setEditSubjectName(prod.subjectName);
+    setEditSubjectCode(prod.subjectCode);
+    setEditDescription(prod.description || '');
+    setEditError('');
+  };
+
+  const handleSaveProductEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+    setIsSavingEdit(true);
+    setEditError('');
+
+    try {
+      const updates: Partial<Product> = {
+        price: Number(editPrice),
+        originalPrice: Number(editOriginalPrice),
+        coverImageUrl: editImageUrl.trim(),
+        imageUrl: editImageUrl.trim(),
+        subjectName: editSubjectName.trim(),
+        subjectCode: editSubjectCode.trim(),
+        description: editDescription.trim(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // 1. Real-time Firestore sync directly
+      await updateProductRealtime(editingProduct.id, updates);
+
+      // 2. Local backend API sync
+      try {
+        await api.updateProduct(editingProduct.id, updates);
+      } catch (apiErr) {
+        console.warn('Backend API update warning (Firebase already updated):', apiErr);
+      }
+
+      // 3. Update local state
+      setProducts((prev) =>
+        prev.map((p) => (p.id === editingProduct.id ? { ...p, ...updates } : p))
+      );
+
+      setActionSuccess(`✓ ${editingProduct.subjectCode} দাম ও ইমেজ সফলভাবে রিয়েল-টাইমে আপডেট হয়েছে!`);
+      setTimeout(() => setActionSuccess(''), 4000);
+      setEditingProduct(null);
+    } catch (err: any) {
+      setEditError(err.message || 'Failed to update subject');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const [isSyncingFirebase, setIsSyncingFirebase] = useState(false);
+  const [isClearingData, setIsClearingData] = useState(false);
+
+  const handleSyncOfficialSubjects = async () => {
+    setIsSyncingFirebase(true);
+    setActionSuccess('');
+    try {
+      const res = await syncAllOfficialProductsToFirestore();
+      if (res.success) {
+        setActionSuccess(`✓ ${res.count}টি অফিসিয়াল BCA বিষয় ও 3D কভার সফলভাবে ফায়ারবেস ফায়ারস্টোরে সিঙ্ক হয়েছে!`);
+        setTimeout(() => setActionSuccess(''), 5000);
+        await loadAllAdminData();
+      } else {
+        setLoginError(res.error || 'Failed to sync to Firestore');
+      }
+    } catch (err: any) {
+      setLoginError(err.message || 'Sync error');
+    } finally {
+      setIsSyncingFirebase(false);
+    }
+  };
+
+  const handleClearTestData = async () => {
+    if (!window.confirm('আপনি কি নিশ্চিত যে সমস্ত পুরাতন টেস্ট অর্ডার, স্টুডেন্ট এবং ডিভাইস ডেটা মুছে ফেলতে চান?')) {
+      return;
+    }
+    setIsClearingData(true);
+    try {
+      const res = await api.clearTestData();
+      if (res.success) {
+        setActionSuccess(`✓ ${res.message}`);
+        setTimeout(() => setActionSuccess(''), 5000);
+        await loadAllAdminData();
+      }
+    } catch (err: any) {
+      setLoginError(err.message || 'Failed to clear data');
+    } finally {
+      setIsClearingData(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -554,13 +664,35 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
                   Upload PDF question banks, set prices in ₹ INR, and publish to students.
                 </p>
               </div>
-              <button
-                onClick={() => setIsAddingProduct(true)}
-                className="btn-gold-primary px-5 py-2.5 text-xs font-black rounded-full flex items-center gap-1.5 cursor-pointer shrink-0 shadow-md"
-              >
-                <Plus className="w-4 h-4 stroke-[3]" />
-                <span>Add Question Bank</span>
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleSyncOfficialSubjects}
+                  disabled={isSyncingFirebase}
+                  className="px-3.5 py-2 text-xs font-bold rounded-full bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 cursor-pointer shadow-sm transition-all disabled:opacity-50"
+                  title="Push all 11 BCA subjects and 3D covers to Firebase Firestore"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingFirebase ? 'animate-spin' : ''}`} />
+                  <span>{isSyncingFirebase ? 'Syncing...' : 'Sync 11 Subjects to Firebase'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearTestData}
+                  disabled={isClearingData}
+                  className="px-3.5 py-2 text-xs font-bold rounded-full bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-500/40 flex items-center gap-1.5 cursor-pointer shadow-sm transition-all disabled:opacity-50"
+                  title="Clear all test orders and student data"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{isClearingData ? 'Clearing...' : 'Clear Test Data'}</span>
+                </button>
+                <button
+                  onClick={() => setIsAddingProduct(true)}
+                  className="btn-gold-primary px-4 py-2 text-xs font-black rounded-full flex items-center gap-1.5 cursor-pointer shrink-0 shadow-md"
+                >
+                  <Plus className="w-4 h-4 stroke-[3]" />
+                  <span>Add Subject</span>
+                </button>
+              </div>
             </div>
 
             {/* Add Subject Form */}
@@ -704,26 +836,59 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
             <div className="divide-y divide-white/10 border border-white/15 rounded-2xl overflow-hidden bg-black/20">
               {products.map((prod) => (
                 <div key={prod.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-bold text-[#FFD34E] bg-[#970014]/60 border border-[#FFE7A3]/40 px-2.5 py-0.5 rounded">
-                        {prod.subjectCode}
-                      </span>
-                      <h4 className="font-extrabold text-sm sm:text-base text-white">{prod.subjectName}</h4>
+                  <div className="flex items-center gap-3.5">
+                    {/* Subject Cover Thumbnail */}
+                    <div className="w-12 h-16 sm:w-14 sm:h-18 rounded-lg overflow-hidden bg-black/50 border border-[#FFD34E]/30 shrink-0 relative flex items-center justify-center shadow-md">
+                      {prod.coverImageUrl || prod.imageUrl ? (
+                        <img
+                          src={prod.coverImageUrl || prod.imageUrl}
+                          alt={prod.subjectName}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-white/40 p-1 text-center">
+                          <Image className="w-4 h-4 text-[#FFD34E]/60 mb-0.5" />
+                          <span className="text-[7.5px] font-bold text-[#FFE7A3]/70">No Image</span>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-white/70">
-                      <span>Price: <strong className="text-[#FFD34E]">₹ {prod.price}</strong></span>
-                      <span>·</span>
-                      <span>{prod.pageCount} Pages</span>
-                      <span>·</span>
-                      <span className="truncate max-w-xs">{prod.examYear}</span>
+
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-[#FFD34E] bg-[#970014]/60 border border-[#FFE7A3]/40 px-2.5 py-0.5 rounded">
+                          {prod.subjectCode}
+                        </span>
+                        <h4 className="font-extrabold text-sm sm:text-base text-white">{prod.subjectName}</h4>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-white/70">
+                        <span>Price: <strong className="text-[#FFD34E] text-sm font-black">₹ {prod.price}</strong></span>
+                        {prod.originalPrice && (
+                          <span className="line-through text-white/40">₹ {prod.originalPrice}</span>
+                        )}
+                        <span>·</span>
+                        <span>{prod.pageCount} Pages</span>
+                        <span>·</span>
+                        <span className="truncate max-w-xs">{prod.examYear}</span>
+                      </div>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
+                    {/* Edit Price & Image Button */}
+                    <button
+                      onClick={() => handleOpenEditProduct(prod)}
+                      className="px-3.5 py-1.5 text-xs font-bold rounded-full bg-[#FFD34E]/20 text-[#FFD34E] border border-[#FFD34E]/40 hover:bg-[#FFD34E] hover:text-[#3D0009] flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>Edit Price &amp; Image</span>
+                    </button>
+
                     <button
                       onClick={() => toggleProductPublished(prod)}
-                      className={`px-4 py-1.5 text-xs font-bold rounded-full transition-colors cursor-pointer ${
+                      className={`px-3 py-1.5 text-xs font-bold rounded-full transition-colors cursor-pointer ${
                         prod.published
                           ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'
                           : 'bg-white/10 text-white/50'
@@ -1052,6 +1217,177 @@ service cloud.firestore {
 }`}
                 </pre>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Real-time Edit Subject & Price Modal */}
+        {editingProduct && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md">
+            <div className="liquid-glass-master rounded-3xl max-w-lg w-full p-5 sm:p-7 border border-[#FFE7A3]/30 shadow-2xl relative text-left">
+              <button
+                onClick={() => setEditingProduct(null)}
+                className="absolute top-4 right-4 p-1.5 text-white/60 hover:text-white rounded-lg hover:bg-white/10 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-center gap-3 mb-4 pb-3 border-b border-white/15">
+                <div className="w-10 h-10 rounded-xl bg-[#FFD34E]/20 border border-[#FFD34E]/40 flex items-center justify-center text-[#FFD34E]">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-white">
+                    Edit Subject: {editingProduct.subjectCode}
+                  </h3>
+                  <p className="text-xs text-[#FFE7A3]">
+                    Firebase Firestore Real-time Sync (দোকানে তৎক্ষণাৎ আপডেট হবে)
+                  </p>
+                </div>
+              </div>
+
+              {editError && (
+                <div className="mb-3.5 p-2.5 bg-rose-950/80 border border-rose-500/50 rounded-xl text-xs text-rose-200">
+                  {editError}
+                </div>
+              )}
+
+              <form onSubmit={handleSaveProductEdit} className="space-y-3.5 text-xs">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-white mb-1">
+                      Selling Price (₹) <span className="text-[#FFD34E]">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      value={editPrice}
+                      onChange={(e) => setEditPrice(Number(e.target.value))}
+                      className="w-full px-3 py-2 bg-black/50 border border-[#FFD34E]/50 rounded-xl text-[#FFD34E] font-bold text-sm focus:outline-none focus:ring-1 focus:ring-[#FFD34E]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-white mb-1">
+                      Original / MRP Cut Price (₹)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={editOriginalPrice}
+                      onChange={(e) => setEditOriginalPrice(Number(e.target.value))}
+                      className="w-full px-3 py-2 bg-black/50 border border-white/20 rounded-xl text-white/70 text-sm focus:outline-none focus:border-[#FFD34E]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-white mb-1">
+                    Subject Image / Thumbnail URL
+                  </label>
+                  <input
+                    type="text"
+                    value={editImageUrl}
+                    onChange={(e) => setEditImageUrl(e.target.value)}
+                    placeholder="https://... or /assets/aistudio/..."
+                    className="w-full px-3 py-2 bg-black/50 border border-white/20 rounded-xl text-white focus:outline-none focus:border-[#FFD34E]"
+                  />
+                  
+                  {/* Preset Image Shortcuts */}
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                    <span className="text-[10px] text-white/50">Quick Presets:</span>
+                    <button
+                      type="button"
+                      onClick={() => setEditImageUrl('/assets/aistudio/BCA_Study_Point_Special_Offer_3cca2cdd.png')}
+                      className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[10px] text-[#FFE7A3]"
+                    >
+                      Offer Banner
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditImageUrl('/assets/aistudio/BCA_Study_Point_Subjects_Banner_4b0de4c1.png')}
+                      className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[10px] text-[#FFE7A3]"
+                    >
+                      Subjects Banner
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditImageUrl(BRAND.logoUrl)}
+                      className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[10px] text-[#FFE7A3]"
+                    >
+                      Official Logo
+                    </button>
+                    {editImageUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setEditImageUrl('')}
+                        className="px-2 py-0.5 rounded bg-rose-950/60 text-rose-300 text-[10px]"
+                      >
+                        Clear Image
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Image Live Preview */}
+                {editImageUrl && (
+                  <div className="p-2.5 bg-black/40 rounded-xl border border-white/10 flex items-center gap-3">
+                    <div className="w-14 h-18 rounded-lg overflow-hidden bg-black/60 border border-[#FFD34E]/40 shrink-0">
+                      <img
+                        src={editImageUrl}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <span className="text-white font-bold block">Live Image Preview</span>
+                      <span className="text-[10px] text-emerald-400">✓ Image ready to attach</span>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block font-bold text-white mb-1">Subject Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={editSubjectName}
+                    onChange={(e) => setEditSubjectName(e.target.value)}
+                    className="w-full px-3 py-2 bg-black/50 border border-white/20 rounded-xl text-white focus:outline-none focus:border-[#FFD34E]"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-white/15">
+                  <button
+                    type="button"
+                    onClick={() => setEditingProduct(null)}
+                    className="px-4 py-2 text-xs text-white/70 hover:text-white cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingEdit}
+                    className="btn-gold-primary px-5 py-2 rounded-full text-xs font-bold cursor-pointer flex items-center gap-1.5"
+                  >
+                    {isSavingEdit ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Syncing to Firebase...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Save &amp; Sync Real-Time</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

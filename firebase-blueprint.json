@@ -1,0 +1,71 @@
+{
+  "entities": {
+    "Student": {
+      "title": "Student",
+      "description": "Registered BCA student profile with device binding and contact details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fullName": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 120 },
+        "mobile": { "type": "string", "maxLength": 15 },
+        "collegeName": { "type": "string", "maxLength": 150 },
+        "studentId": { "type": "string", "maxLength": 50 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "fullName", "email", "mobile"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "BCA Subject question bank digital product with pricing and thumbnail",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "subjectCode": { "type": "string", "maxLength": 50 },
+        "subjectName": { "type": "string", "maxLength": 150 },
+        "semesterId": { "type": "string" },
+        "price": { "type": "number" },
+        "originalPrice": { "type": "number" },
+        "imageUrl": { "type": "string", "maxLength": 500 },
+        "description": { "type": "string", "maxLength": 500 },
+        "pageCount": { "type": "number" },
+        "published": { "type": "boolean" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "subjectCode", "subjectName", "price"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Student question bank purchase order with UPI UTR verification",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "studentEmail": { "type": "string" },
+        "studentMobile": { "type": "string" },
+        "productIds": { "type": "array" },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "verified", "rejected"] },
+        "utrNumber": { "type": "string", "maxLength": 50 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["orderId", "studentId", "totalAmount", "status"]
+    }
+  },
+  "firestore": {
+    "/students/{studentId}": {
+      "schema": "Student",
+      "description": "Private student registration profile"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Public catalog of question banks with real-time price and image management"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Student orders with payment references"
+    }
+  }
+}

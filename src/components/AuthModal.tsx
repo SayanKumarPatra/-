@@ -3,6 +3,9 @@ import { X, Lock, Mail, Phone, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { BRAND } from '../constants/brand';
 
+import { auth, googleProvider } from '../firebase/firebase';
+import { signInWithPopup } from 'firebase/auth';
+
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -23,35 +26,67 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [mobile, setMobile] = useState('');
   const [collegeName, setCollegeName] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   if (!isOpen) return null;
+
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setIsLoading(true);
+    try {
+      const res = await signInWithPopup(auth, googleProvider);
+      if (res.user) {
+        loginStudent({
+          id: res.user.uid,
+          email: res.user.email || '',
+          fullName: res.user.displayName || res.user.email?.split('@')[0] || 'BCA Scholar',
+          mobile: res.user.phoneNumber || '',
+        });
+        if (onSuccess) onSuccess();
+        onClose();
+      }
+    } catch (err: any) {
+      console.warn('Google sign in note:', err);
+      // If popup blocked or cancelled, let student continue with email
+      setError(err.message || 'Google Sign-In was cancelled. You can register with email below.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email.trim() || !emailRegex.test(email.trim())) {
-      setError('Please provide a valid email address.');
-      return;
-    }
+    const cleanMobile = mobile.replace(/\D/g, '');
 
     if (isRegister) {
       if (!fullName.trim() || fullName.trim().length < 2) {
-        setError('Please enter your full name.');
+        setError('দয়া করে আপনার সম্পূর্ণ নাম লিখুন (Please enter your full name).');
         return;
       }
-      const cleanMobile = mobile.replace(/\D/g, '');
       if (cleanMobile.length < 10) {
-        setError('Please enter a valid 10-digit mobile number.');
+        setError('দয়া করে একটি সঠিক ১০ সংখ্যার মোবাইল নম্বর লিখুন (Please enter valid 10-digit mobile number).');
+        return;
+      }
+    } else {
+      const isMobileOnly = /^\d{10}$/.test(email.trim().replace(/\D/g, ''));
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!isMobileOnly && (!email.trim() || !emailRegex.test(email.trim()))) {
+        setError('দয়া করে আপনার রেজিস্টার্ড ইমেইল বা ১০ সংখ্যার মোবাইল নম্বর লিখুন।');
         return;
       }
     }
 
+    const resolvedEmail = email.trim() || `${cleanMobile}@student.bcastudypoint.com`;
+    const resolvedMobile = cleanMobile || (/^\d{10}$/.test(email.replace(/\D/g, '')) ? email.replace(/\D/g, '') : '');
+    const studentId = `std_${resolvedMobile || Date.now()}`;
+
     loginStudent({
-      email: email.trim().toLowerCase(),
-      fullName: fullName.trim() || email.split('@')[0],
-      mobile: mobile.replace(/\D/g, ''),
+      id: studentId,
+      email: resolvedEmail.toLowerCase(),
+      fullName: fullName.trim() || (resolvedMobile ? `Student ${resolvedMobile.slice(-4)}` : resolvedEmail.split('@')[0]),
+      mobile: resolvedMobile,
       collegeName: collegeName.trim() || undefined,
     });
 
@@ -117,6 +152,42 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </button>
         </div>
 
+        {/* Google 1-Click Sign-In */}
+        <button
+          type="button"
+          onClick={handleGoogleSignIn}
+          disabled={isLoading}
+          className="w-full mb-3.5 py-2.5 px-3 bg-white text-gray-900 rounded-full font-bold text-xs flex items-center justify-center gap-2 shadow-md hover:bg-gray-100 transition-colors cursor-pointer"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24">
+            <path
+              fill="#4285F4"
+              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+            />
+            <path
+              fill="#34A853"
+              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+            />
+            <path
+              fill="#FBBC05"
+              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+            />
+            <path
+              fill="#EA4335"
+              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+            />
+          </svg>
+          <span>{isLoading ? 'Connecting Google...' : 'Continue with Google'}</span>
+        </button>
+
+        <div className="flex items-center gap-2 mb-3.5">
+          <div className="flex-1 h-px bg-white/15" />
+          <span className="text-[10px] text-white/50 uppercase font-bold">
+            {isRegister ? 'Or with Name & Mobile' : 'Or with Email / Mobile'}
+          </span>
+          <div className="flex-1 h-px bg-white/15" />
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-3.5">
           {error && (
             <div className="p-2.5 bg-rose-950/80 border border-rose-500/50 rounded-xl text-xs text-rose-200">
@@ -127,7 +198,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {isRegister && (
             <div>
               <label className="block text-xs font-bold text-white mb-1">
-                Full Name
+                Full Name <span className="text-[#FFD34E]">*</span>
               </label>
               <div className="relative">
                 <User className="w-4 h-4 text-white/50 absolute left-3 top-2.5" />
@@ -143,38 +214,56 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
           )}
 
-          <div>
-            <label className="block text-xs font-bold text-white mb-1">
-              Registered Email Address
-            </label>
-            <div className="relative">
-              <Mail className="w-4 h-4 text-white/50 absolute left-3 top-2.5" />
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="student@gmail.com"
-                className="w-full pl-9 pr-3 py-2 text-xs bg-black/30 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-[#FFD34E]"
-              />
+          {isRegister ? (
+            <div>
+              <label className="block text-xs font-bold text-white mb-1">
+                Mobile / WhatsApp Number <span className="text-[#FFD34E]">*</span>
+              </label>
+              <div className="relative">
+                <Phone className="w-4 h-4 text-white/50 absolute left-3 top-2.5" />
+                <input
+                  type="tel"
+                  required
+                  value={mobile}
+                  onChange={(e) => setMobile(e.target.value)}
+                  placeholder="9876543210"
+                  maxLength={10}
+                  className="w-full pl-9 pr-3 py-2 text-xs bg-black/30 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-[#FFD34E]"
+                />
+              </div>
             </div>
-          </div>
+          ) : (
+            <div>
+              <label className="block text-xs font-bold text-white mb-1">
+                Registered Email or 10-Digit Mobile
+              </label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-white/50 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="student@gmail.com or 9876543210"
+                  className="w-full pl-9 pr-3 py-2 text-xs bg-black/30 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-[#FFD34E]"
+                />
+              </div>
+            </div>
+          )}
 
           {isRegister && (
             <>
               <div>
                 <label className="block text-xs font-bold text-white mb-1">
-                  Mobile Number
+                  Email Address <span className="text-white/40 font-normal">(Optional)</span>
                 </label>
                 <div className="relative">
-                  <Phone className="w-4 h-4 text-white/50 absolute left-3 top-2.5" />
+                  <Mail className="w-4 h-4 text-white/50 absolute left-3 top-2.5" />
                   <input
-                    type="tel"
-                    required
-                    value={mobile}
-                    onChange={(e) => setMobile(e.target.value)}
-                    placeholder="9876543210"
-                    maxLength={10}
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="student@gmail.com (Optional)"
                     className="w-full pl-9 pr-3 py-2 text-xs bg-black/30 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-[#FFD34E]"
                   />
                 </div>
