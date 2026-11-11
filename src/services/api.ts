@@ -456,6 +456,16 @@ export const api = {
     });
   },
 
+  async deleteDevice(userId: string): Promise<{ success: boolean; message: string }> {
+    const adminKey = getStoredAdminKey();
+    return safeFetchJson(`/api/admin/devices/${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
+      headers: {
+        'x-admin-key': adminKey || '',
+      },
+    });
+  },
+
   async getAdminAuditLogs(): Promise<{ logs: AdminAuditLog[] }> {
     const adminKey = getStoredAdminKey();
     return safeFetchJson(

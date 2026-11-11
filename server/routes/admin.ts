@@ -384,6 +384,25 @@ adminRouter.post('/devices/reset', requireAdmin, (req, res) => {
   }
 });
 
+adminRouter.delete('/devices/:userId', requireAdmin, (req, res) => {
+  try {
+    const { userId } = req.params;
+    const removed = db.deleteDevice(userId, 'admin');
+    if (!removed) {
+      return res.status(404).json({
+        success: false,
+        error: 'No device record found for this student.',
+      });
+    }
+    res.json({
+      success: true,
+      message: 'Student device record removed successfully.',
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // --- AUDIT LOGS ---
 
 adminRouter.get('/audit-logs', requireAdmin, (req, res) => {

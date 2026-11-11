@@ -955,6 +955,21 @@ class Database {
     return true;
   }
 
+  deleteDevice(userId: string, adminId: string): boolean {
+    const initialLen = this.data.devices.length;
+    this.data.devices = this.data.devices.filter((d) => d.userId !== userId);
+    this.data.viewerSessions = this.data.viewerSessions.filter((s) => s.userId !== userId);
+    this.persist();
+    this.logAdminAction({
+      adminId,
+      action: 'DEVICE_DELETED',
+      targetId: userId,
+      targetType: 'STUDENT',
+      details: `Permanently removed device binding for student ${userId}`,
+    });
+    return this.data.devices.length < initialLen;
+  }
+
   // --- VIEWER SESSIONS ---
   createViewerSession(session: ViewerSession): ViewerSession {
     this.cleanExpiredSessions();

@@ -10,6 +10,11 @@ import {
   Lock,
   RefreshCw,
   Eye,
+  ShieldAlert,
+  ShieldCheck,
+  CheckCircle2,
+  Smartphone,
+  Info,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { api } from '../services/api';
@@ -139,6 +144,7 @@ const SinglePageCanvas: React.FC<SinglePageProps> = ({
       ref={containerRef}
       className="relative bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] border border-slate-300 overflow-hidden select-none mb-6 max-w-full transition-all"
       onContextMenu={(e) => e.preventDefault()}
+      onDragStart={(e) => e.preventDefault()}
     >
       {/* Top Page Header Tag */}
       <div className="bg-slate-100 border-b border-slate-200 px-4 py-1.5 flex items-center justify-between text-[11px] text-slate-600 font-mono">
@@ -172,7 +178,7 @@ const SinglePageCanvas: React.FC<SinglePageProps> = ({
         {/* Native HTML5 Canvas (Eliminates Browser Plugin Blank Screen) */}
         <canvas
           ref={canvasRef}
-          className="max-w-full h-auto block pointer-events-none"
+          className="max-w-full h-auto block pointer-events-none select-none"
         />
 
         {/* Dynamic Translucent Diagonal Watermark Stamped over Canvas */}
@@ -187,10 +193,16 @@ const SinglePageCanvas: React.FC<SinglePageProps> = ({
           ))}
         </div>
 
-        {/* Anti-Pointer Layer */}
+        {/* Anti-Pointer Layer: Completely blocks touch selection, saving image, and right-click */}
         <div
-          className="absolute inset-0 z-30 bg-transparent"
+          className="absolute inset-0 z-30 bg-transparent select-none"
           onContextMenu={(e) => e.preventDefault()}
+          onTouchStart={(e) => {
+            // Allow vertical scroll but prevent long-press context menu
+            if (e.touches.length > 1) {
+              e.preventDefault();
+            }
+          }}
         />
       </div>
 
@@ -224,14 +236,47 @@ export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isWindowBlurred, setIsWindowBlurred] = useState(false);
 
+  // Mandatory DRM Agreement & Consent Modal
+  const [hasAcceptedDrmConsent, setHasAcceptedDrmConsent] = useState(() => {
+    return sessionStorage.getItem('bca_drm_consent_accepted') === 'true';
+  });
+
+  // Dynamic Floating Watermark Coordinates (Pulsates and moves across screen)
+  const [floatingPos, setFloatingPos] = useState({ top: 35, left: 20 });
+
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Load Document with Universal Zero-Fail Architecture (works on Vercel, static hosting, or Express backend)
+  // Active student credentials
+  const activeStudent =
+    student ||
+    (() => {
+      try {
+        return JSON.parse(localStorage.getItem('bca_logged_in_student') || 'null');
+      } catch {
+        return null;
+      }
+    })();
+
+  const studentName = activeStudent?.fullName || 'Student';
+  const studentMobile = activeStudent?.mobile || activeStudent?.email || '';
+
+  // Animate dynamic floating watermark periodically to destroy any attempt of recording
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setFloatingPos({
+        top: Math.floor(Math.random() * 65) + 15,
+        left: Math.floor(Math.random() * 55) + 10,
+      });
+    }, 4500);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Load Document with Universal Zero-Fail Architecture
   const loadDocument = async () => {
     setIsLoading(true);
     setErrorMessage(null);
 
-    // 1. Resolve product metadata first
+    // 1. Resolve product metadata
     const fallbackProd = FALLBACK_PRODUCTS.find((p) => p.id === productId) || {
       id: productId,
       subjectCode: 'BCA',
@@ -241,20 +286,7 @@ export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
     };
     setProductInfo(fallbackProd);
 
-    // 2. Resolve active student and order ID
-    const activeStudent =
-      student ||
-      (() => {
-        try {
-          return JSON.parse(localStorage.getItem('bca_logged_in_student') || 'null');
-        } catch {
-          return null;
-        }
-      })();
-
-    const studentName = activeStudent?.fullName || 'Student';
-    const studentMobile = activeStudent?.mobile || activeStudent?.email || '';
-
+    // 2. Resolve order ID
     let resolvedOrderId = 'ORD-VERIFIED';
     try {
       const cachedOrders = JSON.parse(localStorage.getItem('bca_orders') || '[]');
@@ -300,7 +332,6 @@ export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
             docLoaded = true;
           }
         } else if (sessionRes.error === 'DEVICE_MISMATCH') {
-          // Strict device mismatch from live server
           onDeviceMismatch(sessionRes.registeredDevice, sessionRes.supportInfo);
           onClose();
           return;
@@ -311,12 +342,9 @@ export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
     }
 
     // 4. Guaranteed Direct PDF Stream Fallback (Crucial for Vercel, static hosting, and offline access)
-    // Eliminates the "সার্ভার সংযোগে সমস্যা হয়েছে" error on Vercel deployment!
     if (!docLoaded) {
       try {
         const staticPdfUrl = getProductPdfUrl(productId);
-        console.log(`[PDF Viewer] Streaming high-res protected PDF for ${productId}: ${staticPdfUrl}`);
-
         const res = await fetch(staticPdfUrl);
         if (!res.ok) {
           throw new Error(`Failed to load PDF file (HTTP ${res.status})`);
@@ -348,7 +376,7 @@ export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
     loadDocument();
   }, [productId, student?.id]);
 
-  // Anti-Piracy Event Listeners
+  // Anti-Screenshot & Screen Recording Event Interception
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault();
@@ -356,7 +384,7 @@ export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Block PrintScreen, DevTools, Save, Print, View Source
+      // Block PrintScreen, DevTools, Save, Print, View Source, Snipping Tool
       if (
         (e.ctrlKey && ['p', 's', 'c', 'u', 'i', 'j'].includes(e.key.toLowerCase())) ||
         (e.metaKey && ['p', 's', 'c', 'u', 'i', 'j'].includes(e.key.toLowerCase())) ||
@@ -365,12 +393,17 @@ export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
       ) {
         e.preventDefault();
         e.stopPropagation();
+        // Immediately engage blackout shield upon printscreen keypress
+        setIsWindowBlurred(true);
         return false;
       }
     };
 
+    // When user triggers mobile screenshot shortcut (Power+Vol down), window momentarily loses focus
     const handleVisibilityChange = () => {
-      setIsWindowBlurred(document.hidden);
+      if (document.hidden) {
+        setIsWindowBlurred(true);
+      }
     };
 
     const handleWindowBlur = () => {
@@ -378,7 +411,11 @@ export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
     };
 
     const handleWindowFocus = () => {
-      setIsWindowBlurred(false);
+      // Keep shield active until user explicitly taps "Resume Reading" to prevent rapid screenshot taps
+    };
+
+    const handlePageHide = () => {
+      setIsWindowBlurred(true);
     };
 
     window.addEventListener('contextmenu', handleContextMenu);
@@ -386,6 +423,7 @@ export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleWindowBlur);
     window.addEventListener('focus', handleWindowFocus);
+    window.addEventListener('pagehide', handlePageHide);
 
     return () => {
       window.removeEventListener('contextmenu', handleContextMenu);
@@ -393,6 +431,7 @@ export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleWindowBlur);
       window.removeEventListener('focus', handleWindowFocus);
+      window.removeEventListener('pagehide', handlePageHide);
     };
   }, []);
 
@@ -406,6 +445,17 @@ export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
     }
   };
 
+  const handleAcceptDrmAgreement = () => {
+    sessionStorage.setItem('bca_drm_consent_accepted', 'true');
+    setHasAcceptedDrmConsent(true);
+    // Request fullscreen on mobile/desktop to engage browser protected surface
+    try {
+      containerRef.current?.requestFullscreen?.().catch(() => {});
+    } catch {
+      // ignore
+    }
+  };
+
   const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
 
   return (
@@ -413,23 +463,116 @@ export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
       ref={containerRef}
       className="fixed inset-0 z-50 bg-[#240005] flex flex-col select-none overflow-hidden"
     >
-      {/* Privacy Shield: Window focus lost / Screenshot tool active */}
-      {isWindowBlurred && (
-        <div className="absolute inset-0 z-50 bg-[#3D0009]/95 backdrop-blur-3xl flex flex-col items-center justify-center p-6 text-center">
-          <div className="w-16 h-16 rounded-3xl bg-[#65000D] border border-[#FFD34E]/60 flex items-center justify-center text-[#FFD34E] mb-4 shadow-[0_0_30px_rgba(255,211,78,0.4)]">
-            <Lock className="w-8 h-8" />
+      {/* 1. MANDATORY DRM CONSENT & ANTI-SCREENSHOT AGREEMENT MODAL */}
+      {!hasAcceptedDrmConsent && (
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className="liquid-glass-master max-w-md w-full p-6 sm:p-7 rounded-3xl border border-[#FFD34E]/50 shadow-[0_0_60px_rgba(255,211,78,0.35)] text-center space-y-4">
+            <div className="w-16 h-16 rounded-full bg-[#65000D] border-2 border-[#FFD34E] flex items-center justify-center mx-auto text-[#FFD34E] shadow-[0_0_25px_rgba(255,211,78,0.5)]">
+              <ShieldAlert className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-[10px] font-black tracking-widest text-[#FFD34E] uppercase font-mono">
+                BCA STUDY POINT · SECURITY PROTOCOL
+              </span>
+              <h2 className="text-lg sm:text-xl font-black text-white leading-tight">
+                DRM কন্টেন্ট সুরক্ষা ও অ্যান্টি-পাইরেসি নীতি
+              </h2>
+            </div>
+
+            <div className="p-4 bg-black/60 rounded-2xl border border-white/15 text-left text-xs space-y-2.5 text-white/90">
+              <div className="flex items-start gap-2.5">
+                <span className="text-rose-400 font-bold shrink-0 text-sm">🚫</span>
+                <div>
+                  <strong className="text-white">স্ক্রিনশট ও স্ক্রিন রেকর্ডিং সম্পূর্ণ নিষিদ্ধ:</strong>
+                  <p className="text-[11px] text-[#FFE7A3]/90 mt-0.5">
+                    মোবাইলে স্ক্রিনশট বা স্ক্রিন রেকর্ডিং অন করার চেষ্টা করলেই স্ক্রিন স্বয়ংক্রিয়ভাবে কালো (Blackout) হয়ে যাবে।
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2.5">
+                <span className="text-[#FFD34E] font-bold shrink-0 text-sm">📱</span>
+                <div>
+                  <strong className="text-white">ব্যক্তিগত ডাইনামিক ওয়াটারমার্ক:</strong>
+                  <p className="text-[11px] text-[#FFE7A3]/90 mt-0.5">
+                    আপনার নাম ({studentName}) ও মোবাইল নম্বর ({studentMobile}) প্রতি পেজে ডাইনামিক ওয়াটারমার্ক করা রয়েছে।
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2.5">
+                <span className="text-emerald-400 font-bold shrink-0 text-sm">🔒</span>
+                <div>
+                  <strong className="text-white">১ ছাত্র = ১ ডিভাইস পলিসি:</strong>
+                  <p className="text-[11px] text-[#FFE7A3]/90 mt-0.5">
+                    আপনার অ্যাকাউন্ট শুধুমাত্র এই নির্দিষ্ট অনুমোদিত ডিভাইসে সক্রিয় থাকবে।
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 flex flex-col gap-2.5">
+              <button
+                type="button"
+                onClick={handleAcceptDrmAgreement}
+                className="btn-gold-primary w-full py-3 px-6 rounded-full text-xs sm:text-sm font-black flex items-center justify-center gap-2 cursor-pointer shadow-lg hover:scale-[1.02] transition-transform"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>আমি একমত ও সিকিউরিটি শিল্ড সক্রিয় করুন</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-xs text-white/60 hover:text-white py-1 cursor-pointer"
+              >
+                বাতিল করুন (Exit Viewer)
+              </button>
+            </div>
           </div>
-          <h2 className="text-2xl font-black text-white tracking-tight">
-            Security Shield Active
-          </h2>
-          <p className="mt-2 text-xs sm:text-sm text-[#FFE7A3] max-w-md leading-relaxed">
-            স্ক্রিনশট বা অন্য উইন্ডো পরিবর্তনের কারণে কন্টেন্ট সাময়িকভাবে লুকানো হয়েছে। পড়তে পুনরায় এই উইন্ডোতে ক্লিক করুন।
-          </p>
-          <span className="mt-4 text-[10px] font-mono text-white/50 tracking-wider">
-            {BRAND.name} · DRM CANVAS ANTI-PIRACY
-          </span>
         </div>
       )}
+
+      {/* 2. SOLID BLACKOUT PRIVACY SHIELD (Captures black frame on screenshot/screen-record attempt) */}
+      {isWindowBlurred && (
+        <div
+          onClick={() => setIsWindowBlurred(false)}
+          className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-6 text-center select-none"
+        >
+          <div className="w-16 h-16 rounded-full bg-rose-600/25 border-2 border-rose-500 flex items-center justify-center text-rose-400 mb-4 shadow-[0_0_35px_rgba(244,63,94,0.6)] animate-pulse">
+            <Lock className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl sm:text-2xl font-black text-rose-400 tracking-tight">
+            🚫 SCREENSHOT / RECORDING BLOCKED
+          </h2>
+          <p className="mt-2 text-xs sm:text-sm text-white/90 max-w-md leading-relaxed">
+            স্ক্রিনশট নেওয়ার চেষ্টা, স্ক্রিন রেকর্ডিং অ্যাপ বা অন্য উইন্ডো পরিবর্তনের কারণে কন্টেন্ট সম্পূর্ণ কালো (Blackout) করা হয়েছে।
+          </p>
+          <div className="mt-3 p-3 bg-white/10 rounded-xl border border-white/15 text-xs text-[#FFE7A3] font-mono">
+            Student: {studentName} · 📱 {studentMobile} · Ref: {orderId}
+          </div>
+          <button
+            onClick={() => setIsWindowBlurred(false)}
+            className="mt-5 btn-gold-primary px-6 py-2.5 rounded-full text-xs font-black cursor-pointer shadow-lg"
+          >
+            নোটস পড়া চালিয়ে যান (Resume Reading)
+          </button>
+        </div>
+      )}
+
+      {/* 3. DYNAMIC FLOATING WATERMARK HOLOGRAM (Shifts position continuously) */}
+      <div
+        className="fixed z-40 pointer-events-none transition-all duration-1000 ease-in-out opacity-40 select-none hidden sm:block"
+        style={{
+          top: `${floatingPos.top}%`,
+          left: `${floatingPos.left}%`,
+        }}
+      >
+        <div className="px-3 py-1 rounded-full bg-black/60 border border-[#FFD34E]/60 text-[#FFE7A3] font-mono text-[10px] font-bold shadow-md whitespace-nowrap">
+          🔒 {studentName} · 📱 {studentMobile} · BCA STUDY POINT
+        </div>
+      </div>
 
       {/* Top Floating Glass Toolbar */}
       <div className="h-16 bg-[#3D0009]/95 border-b border-[#FFE7A3]/25 px-4 sm:px-6 flex items-center justify-between text-white shrink-0 z-20 backdrop-blur-xl shadow-lg">
@@ -446,21 +589,27 @@ export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
               {productInfo?.subjectName || 'BCA Question Bank'}
             </h1>
             <p className="text-[10px] text-[#FFE7A3] truncate">
-              Student: {student?.fullName || 'Student'} ({student?.mobile || student?.email || ''})
+              Student: {studentName} ({studentMobile})
             </p>
           </div>
         </div>
 
-        {/* Center: Live Scroll Page Tracker */}
-        {pdfDoc && (
-          <div className="flex items-center gap-2 text-xs text-white font-semibold bg-black/50 px-3 py-1.5 rounded-full border border-[#FFE7A3]/30 backdrop-blur-md">
-            <Eye className="w-3.5 h-3.5 text-[#FFD34E]" />
-            <span className="hidden sm:inline">Page</span>
-            <span className="font-extrabold text-[#FFD34E] tabular-nums">{currentPageInView}</span>
-            <span className="text-white/60">/</span>
-            <span className="tabular-nums">{totalPages}</span>
-          </div>
-        )}
+        {/* Center: Live Scroll Page Tracker & DRM Shield Indicator */}
+        <div className="hidden xs:flex items-center gap-2">
+          {pdfDoc && (
+            <div className="flex items-center gap-2 text-xs text-white font-semibold bg-black/50 px-3 py-1.5 rounded-full border border-[#FFE7A3]/30 backdrop-blur-md">
+              <Eye className="w-3.5 h-3.5 text-[#FFD34E]" />
+              <span className="hidden sm:inline">Page</span>
+              <span className="font-extrabold text-[#FFD34E] tabular-nums">{currentPageInView}</span>
+              <span className="text-white/60">/</span>
+              <span className="tabular-nums">{totalPages}</span>
+            </div>
+          )}
+          <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-2.5 py-1 rounded-full">
+            <ShieldCheck className="w-3 h-3 text-emerald-400" />
+            <span>DRM Shield Active</span>
+          </span>
+        </div>
 
         {/* Right: Zoom & Close Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2">
@@ -548,8 +697,8 @@ export const SecurePdfViewer: React.FC<SecurePdfViewerProps> = ({
                 pdfDoc={pdfDoc}
                 pageNumber={pageNum}
                 zoomLevel={zoomLevel}
-                studentName={student?.fullName || 'Student'}
-                studentMobile={student?.mobile || student?.email || ''}
+                studentName={studentName}
+                studentMobile={studentMobile}
                 orderId={orderId}
                 onInView={(inViewPage) => setCurrentPageInView(inViewPage)}
               />

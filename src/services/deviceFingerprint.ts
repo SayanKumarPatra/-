@@ -25,27 +25,30 @@ export function getOrCreateDeviceToken(): DeviceInfo {
   }
 
   const userAgent = navigator.userAgent;
-  let os = 'Unknown OS';
-  if (userAgent.indexOf('Win') !== -1) os = 'Windows PC';
-  else if (userAgent.indexOf('Mac') !== -1) os = 'macOS';
-  else if (userAgent.indexOf('Android') !== -1) os = 'Android Device';
-  else if (userAgent.indexOf('iPhone') !== -1 || userAgent.indexOf('iPad') !== -1) os = 'iOS Device';
-  else if (userAgent.indexOf('Linux') !== -1) os = 'Linux';
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent) || (typeof window !== 'undefined' && window.innerWidth < 768);
 
-  let browser = 'Unknown Browser';
+  let os = 'Unknown OS';
+  if (userAgent.indexOf('Win') !== -1) os = 'Windows Desktop';
+  else if (userAgent.indexOf('Mac') !== -1) os = isMobile ? 'iPad / iOS' : 'Mac Desktop';
+  else if (userAgent.indexOf('Android') !== -1) os = 'Mobile Android';
+  else if (userAgent.indexOf('iPhone') !== -1) os = 'Mobile iPhone';
+  else if (userAgent.indexOf('iPad') !== -1) os = 'Tablet iPad';
+  else if (userAgent.indexOf('Linux') !== -1) os = isMobile ? 'Mobile Linux' : 'Linux PC';
+
+  let browser = 'Browser';
   if (userAgent.indexOf('Firefox') !== -1) browser = 'Firefox';
   else if (userAgent.indexOf('SamsungBrowser') !== -1) browser = 'Samsung Internet';
   else if (userAgent.indexOf('Opera') !== -1 || userAgent.indexOf('OPR') !== -1) browser = 'Opera';
   else if (userAgent.indexOf('Edge') !== -1 || userAgent.indexOf('Edg') !== -1) browser = 'Edge';
-  else if (userAgent.indexOf('Chrome') !== -1) browser = 'Chrome';
-  else if (userAgent.indexOf('Safari') !== -1) browser = 'Safari';
+  else if (userAgent.indexOf('Chrome') !== -1) browser = isMobile ? 'Mobile Chrome' : 'Desktop Chrome';
+  else if (userAgent.indexOf('Safari') !== -1) browser = isMobile ? 'Mobile Safari' : 'Desktop Safari';
 
-  const screenResolution = `${window.screen.width}x${window.screen.height}`;
+  const screenResolution = typeof window !== 'undefined' ? `${window.screen.width}x${window.screen.height}` : '1920x1080';
 
   return {
     token,
-    userAgent,
-    os,
+    userAgent: `${isMobile ? 'Mobile' : 'Desktop'} · ${browser} on ${os}`,
+    os: `${isMobile ? '📱 Mobile' : '💻 Desktop'}: ${os}`,
     browser,
     screenResolution,
   };

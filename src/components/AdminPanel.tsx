@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { api, getStoredAdminKey, setStoredAdminKey } from '../services/api';
 import { BRAND } from '../constants/brand';
+import { FALLBACK_PRODUCTS } from '../constants/fallbackProducts';
 import {
   updateProductRealtime,
   syncAllOfficialProductsToFirestore,
@@ -73,7 +74,10 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
 
   // Search and order filter
   const [searchFilter, setSearchFilter] = useState('');
-  const [orderStatusFilter, setOrderStatusFilter] = useState<'all' | 'pending' | 'verified'>('all');
+  const [orderStatusFilter, setOrderStatusFilter] = useState<'all' | 'pending' | 'verified' | 'rejected'>('all');
+  const [rejectingOrder, setRejectingOrder] = useState<Order | null>(null);
+  const [rejectReasonText, setRejectReasonText] = useState('ফেক পেমেন্ট রসিদ / ভুল UTR');
+  const [isSubmittingReject, setIsSubmittingReject] = useState(false);
 
   // Real-time Product Edit Modal State
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -444,9 +448,19 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
     }
   };
 
-  const handleRejectOrder = async (orderId: string) => {
-    const reason = prompt('অর্ডার বাতিলের কারণ লিখুন (Reason for rejection):', 'Payment UTR verification failed');
-    if (reason === null) return;
+  const handleRejectOrder = (orderId: string) => {
+    const ord = orders.find((o) => o.orderId === orderId);
+    if (ord) {
+      setRejectingOrder(ord);
+      setRejectReasonText('ভুল বা ফেক পেমেন্ট রসিদ / Fake UTR');
+    }
+  };
+
+  const handleConfirmRejectOrder = async () => {
+    if (!rejectingOrder) return;
+    const orderId = rejectingOrder.orderId;
+    const reason = rejectReasonText.trim() || 'Payment verification failed / Fake receipt';
+    setIsSubmittingReject(true);
     try {
       await updateOrderStatusRealtime(orderId, 'failed', { rejectionReason: reason });
       try {
@@ -461,10 +475,30 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
         )
       );
 
-      showSuccessBanner(`অর্ডার ${orderId} বাতিল করা হয়েছে।`);
+      showSuccessBanner(`✓ অর্ডার ${orderId} (${rejectingOrder.studentName}) সফলভাবে বাতিল করা হয়েছে।`);
+      setRejectingOrder(null);
       loadAllAdminData();
     } catch (err: any) {
       alert(err.message || 'অর্ডার বাতিল করতে সমস্যা হয়েছে');
+    } finally {
+      setIsSubmittingReject(false);
+    }
+  };
+
+  const handleDeleteDevice = async (userId: string, studentName: string) => {
+    if (
+      !window.confirm(
+        `আপনি কি নিশ্চিত যে "${studentName}" এর ডিভাইস স্থায়ীভাবে মুছে ফেলতে চান? সে আবার যেকোনো নতুন ডিভাইস থেকে লগইন করতে পারবে।`
+      )
+    ) {
+      return;
+    }
+    try {
+      await api.deleteDevice(userId);
+      showSuccessBanner(`✓ ${studentName}-এর ডিভাইস সফলভাবে রিমুভ করা হয়েছে!`);
+      loadAllAdminData();
+    } catch (err: any) {
+      alert(err.message || 'ডিভাইস মুছতে সমস্যা হয়েছে');
     }
   };
 
@@ -1183,81 +1217,145 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
           </div>
         )}
 
-        {/* Tab 4: Orders & Transactions */}
+        {/* Tab 4: Customer Orders & Sales Listing (Live 24/7 Tracking) */}
         {activeTab === 'orders' && (
-          <div className="liquid-glass-master rounded-3xl border border-[#FFE7A3]/30 p-6 sm:p-8 space-y-4 shadow-2xl">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-black text-white">Order Transactions &amp; Gateway Records</h3>
-                <p className="text-xs text-[#FFE7A3]">
-                  Verified payments with student identity, payment reference, and purchased subjects.
-                </p>
+          <div className="space-y-6">
+            {/* Business Growth & Real-Time Live Status Banner */}
+            <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-[#65000D]/90 via-[#3D0009]/95 to-[#240005] border border-[#FFD34E]/40 shadow-xl space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-white/10">
+                <div className="flex items-center gap-2.5">
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                  </span>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                      <span>Customer Sales &amp; Growth Listing</span>
+                      <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/20 border border-emerald-400/40 px-2 py-0.5 rounded-full">
+                        🟢 24/7 Live Real-Time
+                      </span>
+                    </h3>
+                    <p className="text-xs text-[#FFE7A3]">
+                      কারা কারা কিনছে, কে কটা বিষয় কিনল এবং তাদের পেমেন্ট প্রুফ রিয়েল-টাইমে মনিটর করুন।
+                    </p>
+                  </div>
+                </div>
+
+                <div className="relative w-full sm:w-72">
+                  <Search className="w-3.5 h-3.5 text-white/50 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchFilter}
+                    onChange={(e) => setSearchFilter(e.target.value)}
+                    placeholder="নাম, ফোন নম্বর, UTR বা অর্ডার আইডি খুঁজুন..."
+                    className="w-full pl-8 pr-3 py-2 text-xs bg-black/60 border border-white/20 rounded-full text-white placeholder-white/40 focus:outline-none focus:border-[#FFD34E]"
+                  />
+                </div>
               </div>
 
-              {/* Search bar */}
-              <div className="relative w-full sm:w-64">
-                <Search className="w-3.5 h-3.5 text-white/50 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={searchFilter}
-                  onChange={(e) => setSearchFilter(e.target.value)}
-                  placeholder="Search student, UTR, order ID..."
-                  className="w-full pl-8 pr-3 py-1.5 text-xs bg-black/40 border border-white/20 rounded-full text-white placeholder-white/40 focus:outline-none focus:border-[#FFD34E]"
-                />
+              {/* Business Growth Metrics Row */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div className="bg-black/40 p-3.5 rounded-2xl border border-white/10">
+                  <span className="text-[11px] font-bold text-[#FFE7A3] block">👥 মোট শিক্ষার্থী</span>
+                  <span className="text-xl sm:text-2xl font-black text-white block mt-0.5">
+                    {new Set(orders.map((o) => o.studentEmail?.toLowerCase()).filter(Boolean)).size || orders.length}
+                  </span>
+                  <span className="text-[10px] text-white/50">নিবন্ধিত ক্রেতা</span>
+                </div>
+
+                <div className="bg-black/40 p-3.5 rounded-2xl border border-white/10">
+                  <span className="text-[11px] font-bold text-emerald-300 block">💰 মোট বিক্রয় রেভিনিউ</span>
+                  <span className="text-xl sm:text-2xl font-black text-[#FFD34E] block mt-0.5">
+                    ₹{orders.filter((o) => o.paymentStatus === 'verified').reduce((s, o) => s + (o.totalAmount || 0), 0)}
+                  </span>
+                  <span className="text-[10px] text-emerald-400/80">
+                    {orders.filter((o) => o.paymentStatus === 'verified').length}টি সফল অর্ডার
+                  </span>
+                </div>
+
+                <div className="bg-black/40 p-3.5 rounded-2xl border border-white/10">
+                  <span className="text-[11px] font-bold text-blue-300 block">📦 মোট পঠিত বিষয়</span>
+                  <span className="text-xl sm:text-2xl font-black text-white block mt-0.5">
+                    {orders
+                      .filter((o) => o.paymentStatus === 'verified')
+                      .reduce((s, o) => s + (o.items?.length || o.selectedProductIds?.length || 1), 0)}টি
+                  </span>
+                  <span className="text-[10px] text-white/50">প্রশ্নপত্র আনলকড</span>
+                </div>
+
+                <div className="bg-black/40 p-3.5 rounded-2xl border border-amber-400/40">
+                  <span className="text-[11px] font-bold text-amber-300 block">⏳ যাচাইকরণ বাকি</span>
+                  <span className="text-xl sm:text-2xl font-black text-amber-200 block mt-0.5">
+                    {orders.filter((o) => o.paymentStatus === 'pending').length}টি
+                  </span>
+                  <span className="text-[10px] text-amber-300/80">অনুমোদনের অপেক্ষায়</span>
+                </div>
               </div>
             </div>
 
-            {/* Status Filter Tabs */}
+            {/* Filter Tabs */}
             <div className="flex flex-wrap items-center gap-2 pb-1">
               <button
                 type="button"
                 onClick={() => setOrderStatusFilter('all')}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
                   orderStatusFilter === 'all'
                     ? 'btn-gold-primary shadow-sm'
                     : 'bg-black/30 text-white/70 hover:text-white border border-white/15'
                 }`}
               >
-                All Orders ({orders.length})
+                সকল অর্ডার ({orders.length})
               </button>
               <button
                 type="button"
                 onClick={() => setOrderStatusFilter('pending')}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                   orderStatusFilter === 'pending'
-                    ? 'bg-amber-400 text-black font-black shadow-sm'
+                    ? 'bg-amber-400 text-black font-black shadow-md'
                     : 'bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 border border-amber-400/40'
                 }`}
               >
                 <Clock className="w-3.5 h-3.5" />
-                <span>Pending Verification ({orders.filter((o) => o.paymentStatus === 'pending').length})</span>
+                <span>যাচাইকরণ বাকি ({orders.filter((o) => o.paymentStatus === 'pending').length})</span>
               </button>
               <button
                 type="button"
                 onClick={() => setOrderStatusFilter('verified')}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                   orderStatusFilter === 'verified'
-                    ? 'bg-emerald-500 text-black font-black shadow-sm'
+                    ? 'bg-emerald-500 text-black font-black shadow-md'
                     : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-400/40'
                 }`}
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Verified &amp; Active ({orders.filter((o) => o.paymentStatus === 'verified').length})</span>
+                <span>অনুমোদিত ও সক্রিয় ({orders.filter((o) => o.paymentStatus === 'verified').length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setOrderStatusFilter('rejected')}
+                className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  orderStatusFilter === 'rejected'
+                    ? 'bg-rose-500 text-white font-black shadow-md'
+                    : 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-400/40'
+                }`}
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>ফেক / বাতিল ({orders.filter((o) => o.paymentStatus === 'rejected' || o.paymentStatus === 'failed').length})</span>
               </button>
             </div>
 
-            <div className="overflow-x-auto border border-white/15 rounded-2xl bg-black/20">
+            {/* Orders Table */}
+            <div className="overflow-x-auto border border-white/15 rounded-2xl bg-black/30 shadow-2xl">
               <table className="w-full text-left text-xs">
-                <thead className="bg-black/40 text-[#FFE7A3] uppercase font-bold text-[10px] tracking-wider border-b border-white/10">
+                <thead className="bg-black/60 text-[#FFE7A3] uppercase font-bold text-[10px] tracking-wider border-b border-white/10">
                   <tr>
-                    <th className="p-3.5">Order ID</th>
-                    <th className="p-3.5">Student</th>
-                    <th className="p-3.5">Subjects</th>
-                    <th className="p-3.5">Amount</th>
-                    <th className="p-3.5">Status</th>
-                    <th className="p-3.5">Gateway / UTR</th>
-                    <th className="p-3.5">Date</th>
-                    <th className="p-3.5 text-center">Action / Approval</th>
+                    <th className="p-3.5">অর্ডার ও তারিখ</th>
+                    <th className="p-3.5">শিক্ষার্থীর তথ্য (Customer)</th>
+                    <th className="p-3.5">কে কটা বিষয় কিনল (Subjects)</th>
+                    <th className="p-3.5">মোট মূল্য</th>
+                    <th className="p-3.5">পেমেন্ট UTR প্রুফ</th>
+                    <th className="p-3.5">বর্তমান স্ট্যাটাস</th>
+                    <th className="p-3.5 text-center">অনুমোদন / ফেক রিজেক্ট</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/10">
@@ -1265,6 +1363,12 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
                     .filter((o) => {
                       if (orderStatusFilter === 'pending' && o.paymentStatus !== 'pending') return false;
                       if (orderStatusFilter === 'verified' && o.paymentStatus !== 'verified') return false;
+                      if (
+                        orderStatusFilter === 'rejected' &&
+                        o.paymentStatus !== 'rejected' &&
+                        o.paymentStatus !== 'failed'
+                      )
+                        return false;
                       if (searchFilter.trim()) {
                         const q = searchFilter.toLowerCase();
                         const match =
@@ -1279,10 +1383,10 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
                     })
                     .length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="p-8 text-center text-white/50">
+                      <td colSpan={7} className="p-10 text-center text-white/50">
                         {orderStatusFilter === 'pending'
-                          ? 'কোনো পেন্ডিং অর্ডার নেই (No orders awaiting verification).'
-                          : 'No matching orders found.'}
+                          ? '✓ কোনো পেন্ডিং অর্ডার নেই। সকল পেমেন্ট অনুমোদিত।'
+                          : 'কোনো মিল পাওয়া যায়নি (No matching orders found)।'}
                       </td>
                     </tr>
                   ) : (
@@ -1290,6 +1394,12 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
                       .filter((o) => {
                         if (orderStatusFilter === 'pending' && o.paymentStatus !== 'pending') return false;
                         if (orderStatusFilter === 'verified' && o.paymentStatus !== 'verified') return false;
+                        if (
+                          orderStatusFilter === 'rejected' &&
+                          o.paymentStatus !== 'rejected' &&
+                          o.paymentStatus !== 'failed'
+                        )
+                          return false;
                         if (searchFilter.trim()) {
                           const q = searchFilter.toLowerCase();
                           const match =
@@ -1302,115 +1412,302 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
                         }
                         return true;
                       })
-                      .map((o) => (
-                        <tr key={o.orderId} className="hover:bg-white/5">
-                          <td className="p-3.5 font-mono font-bold text-white">{o.orderId}</td>
-                        <td className="p-3.5">
-                          <span className="font-bold block text-white">{o.studentName}</span>
-                          <span className="text-[11px] text-white/60">{o.studentEmail}</span>
-                          {o.studentMobile && (
-                            <span className="text-[10px] text-[#FFE7A3] block font-mono">📱 {o.studentMobile}</span>
-                          )}
-                        </td>
-                        <td className="p-3.5 font-semibold text-[#FFE7A3]">
-                          {o.items.map((i) => i.subjectCode).join(', ')}
-                        </td>
-                        <td className="p-3.5 font-black text-[#FFD34E] tabular-nums text-sm">
-                          ₹ {o.totalAmount}
-                        </td>
-                        <td className="p-3.5">
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                              o.paymentStatus === 'verified'
-                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'
-                                : o.paymentStatus === 'rejected' || o.paymentStatus === 'failed'
-                                ? 'bg-rose-500/20 text-rose-300 border border-rose-400/40'
-                                : 'bg-amber-500/20 text-amber-300 border border-amber-400/40 animate-pulse'
-                            }`}
-                          >
-                            {o.paymentStatus === 'verified'
-                              ? 'VERIFIED & ACTIVE'
-                              : o.paymentStatus === 'rejected'
-                              ? 'REJECTED'
-                              : 'PENDING VERIFICATION'}
-                          </span>
-                        </td>
-                        <td className="p-3.5 font-mono text-[11px] text-[#FFD34E] font-bold truncate max-w-[140px]">
-                          {o.paymentReference || 'N/A'}
-                        </td>
-                        <td className="p-3.5 text-white/70 whitespace-nowrap text-[11px]">
-                          {new Date(o.createdAt).toLocaleDateString('en-IN', {
-                            day: 'numeric',
-                            month: 'short',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </td>
-                        <td className="p-3.5 text-center whitespace-nowrap">
-                          <div className="flex items-center justify-center gap-2">
-                            {o.paymentStatus === 'pending' ? (
-                              <div className="flex items-center justify-center gap-1.5">
-                                <button
-                                  onClick={() => handleApproveOrder(o.orderId)}
-                                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full text-[11px] font-black flex items-center gap-1 shadow-sm transition-colors cursor-pointer"
-                                  title="Approve payment & unlock PDF access"
-                                >
-                                  <CheckCircle2 className="w-3.5 h-3.5" />
-                                  <span>Approve Access</span>
-                                </button>
-                                <button
-                                  onClick={() => handleRejectOrder(o.orderId)}
-                                  className="px-2.5 py-1 bg-rose-600/80 hover:bg-rose-600 text-white rounded-full text-[11px] font-bold transition-colors cursor-pointer"
-                                  title="Reject order"
-                                >
-                                  <X className="w-3.5 h-3.5" />
-                                  <span>Reject</span>
-                                </button>
-                              </div>
-                            ) : o.paymentStatus === 'verified' ? (
-                              <div className="flex items-center justify-center gap-1 text-emerald-400 font-bold text-[11px]">
-                                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                                <span>Granted</span>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => handleApproveOrder(o.orderId)}
-                                className="px-2.5 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-400/40 rounded-full text-[10px] font-bold hover:bg-amber-500/30 cursor-pointer"
-                              >
-                                Re-Approve
-                              </button>
-                            )}
+                      .map((o) => {
+                        const cleanMobile = (o.studentMobile || '').replace(/\D/g, '');
+                        const subjectsCount = o.items?.length || o.selectedProductIds?.length || 1;
+                        const cleanUtr = (o.paymentReference || '').replace('upi_', '');
 
-                            {/* Delete Order Button */}
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteOrder(o.orderId, o.studentName)}
-                              className="p-1.5 text-white/40 hover:text-rose-400 hover:bg-rose-500/20 rounded-lg transition-colors cursor-pointer"
-                              title="Delete Order (মুছে ফেলুন)"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                        return (
+                          <tr key={o.orderId} className="hover:bg-white/5 transition-colors">
+                            {/* Order ID & Date */}
+                            <td className="p-3.5">
+                              <span className="font-mono font-bold text-white block">{o.orderId}</span>
+                              <span className="text-[10px] text-white/60">
+                                {new Date(o.createdAt).toLocaleDateString('en-IN', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </span>
+                            </td>
+
+                            {/* Student Details with WhatsApp direct chat */}
+                            <td className="p-3.5">
+                              <div className="space-y-0.5">
+                                <span className="font-extrabold text-sm text-white block">{o.studentName}</span>
+                                {o.studentMobile && (
+                                  <div className="flex items-center gap-1.5 text-xs text-[#FFE7A3]">
+                                    <span className="font-mono font-bold">📱 {o.studentMobile}</span>
+                                    {cleanMobile.length >= 10 && (
+                                      <a
+                                        href={`https://wa.me/91${cleanMobile}?text=${encodeURIComponent(
+                                          `Hello ${o.studentName}, This is BCA STUDY POINT regarding your order ${o.orderId}.`
+                                        )}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 underline"
+                                        title="WhatsApp Message"
+                                      >
+                                        [Chat]
+                                      </a>
+                                    )}
+                                  </div>
+                                )}
+                                <span className="text-[10px] text-white/50 block truncate max-w-[170px]">
+                                  {o.studentEmail}
+                                </span>
+                                {o.collegeName && (
+                                  <span className="text-[9.5px] text-white/40 block truncate max-w-[170px]">
+                                    🏛️ {o.collegeName}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Subjects & Quantity */}
+                            <td className="p-3.5">
+                              <div className="space-y-1">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-[#FFD34E]/20 text-[#FFD34E] border border-[#FFD34E]/40">
+                                  {subjectsCount}টি বিষয় কেনা হয়েছে
+                                </span>
+                                <div className="flex flex-wrap gap-1 max-w-xs">
+                                  {o.items && o.items.length > 0 ? (
+                                    o.items.map((it) => (
+                                      <span
+                                        key={it.productId}
+                                        className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-white/10 text-white/90 border border-white/15"
+                                        title={it.subjectName}
+                                      >
+                                        {it.subjectCode}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    (o.selectedProductIds || []).map((pid) => {
+                                      const fb = FALLBACK_PRODUCTS.find((p) => p.id === pid);
+                                      return (
+                                        <span
+                                          key={pid}
+                                          className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-white/10 text-white/90 border border-white/15"
+                                        >
+                                          {fb?.subjectCode || pid}
+                                        </span>
+                                      );
+                                    })
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Total Amount */}
+                            <td className="p-3.5">
+                              <span className="font-black text-[#FFD34E] text-base tabular-nums">
+                                ₹{o.totalAmount}
+                              </span>
+                            </td>
+
+                            {/* Payment UTR Proof */}
+                            <td className="p-3.5">
+                              <div className="space-y-0.5">
+                                <span className="font-mono text-xs font-black text-white bg-black/60 px-2 py-0.5 rounded border border-white/20 select-all block max-w-fit">
+                                  {cleanUtr || 'N/A'}
+                                </span>
+                                <span className="text-[10px] text-white/50 block">BharatPe UPI</span>
+                              </div>
+                            </td>
+
+                            {/* Status */}
+                            <td className="p-3.5">
+                              {o.paymentStatus === 'verified' ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-400/50">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                  <span>অনুমোদিত ও সক্রিয়</span>
+                                </span>
+                              ) : o.paymentStatus === 'rejected' || o.paymentStatus === 'failed' ? (
+                                <div>
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-400/50">
+                                    <X className="w-3.5 h-3.5 text-rose-400" />
+                                    <span>ফেক / বাতিল</span>
+                                  </span>
+                                  {o.rejectionReason && (
+                                    <span className="text-[9.5px] text-rose-300/80 block mt-0.5 max-w-[130px] truncate" title={o.rejectionReason}>
+                                      {o.rejectionReason}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-200 border border-amber-400/60 animate-pulse">
+                                  <Clock className="w-3.5 h-3.5 text-amber-300" />
+                                  <span>যাচাইকরণ বাকি</span>
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Action / Approval / Reject Fake Buttons */}
+                            <td className="p-3.5 text-center whitespace-nowrap">
+                              <div className="flex items-center justify-center gap-2">
+                                {o.paymentStatus === 'pending' ? (
+                                  <>
+                                    <button
+                                      onClick={() => handleApproveOrder(o.orderId)}
+                                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full text-xs font-black flex items-center gap-1 shadow-sm transition-transform hover:scale-105 cursor-pointer"
+                                      title="Approve access and unlock question bank"
+                                    >
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                      <span>অনুমোদন দিন</span>
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setRejectingOrder(o);
+                                        setRejectReasonText('ফেক পেমেন্ট রসিদ / ভুল UTR');
+                                      }}
+                                      className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-full text-xs font-bold transition-colors cursor-pointer"
+                                      title="Reject fake payment receipt"
+                                    >
+                                      <span>ফেক রিজেক্ট</span>
+                                    </button>
+                                  </>
+                                ) : o.paymentStatus === 'verified' ? (
+                                  <button
+                                    onClick={() => {
+                                      setRejectingOrder(o);
+                                      setRejectReasonText('অ্যাক্সেস প্রত্যাহার / ফেক পেমেন্ট');
+                                    }}
+                                    className="px-2.5 py-1 text-[11px] text-rose-300 hover:text-white bg-rose-950/60 hover:bg-rose-900 border border-rose-500/40 rounded-full transition-colors cursor-pointer"
+                                    title="Revoke student access"
+                                  >
+                                    Revoke
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleApproveOrder(o.orderId)}
+                                    className="px-3 py-1 bg-amber-500/20 text-amber-300 border border-amber-400/50 rounded-full text-xs font-bold hover:bg-amber-500/30 cursor-pointer"
+                                    title="Re-approve access"
+                                  >
+                                    পুনরায় সক্রিয় করুন
+                                  </button>
+                                )}
+
+                                {/* Delete order */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteOrder(o.orderId, o.studentName)}
+                                  className="p-1.5 text-white/40 hover:text-rose-400 hover:bg-rose-500/20 rounded-lg transition-colors cursor-pointer"
+                                  title="অর্ডার রেকর্ড মুছে ফেলুন"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
                   )}
                 </tbody>
               </table>
             </div>
+
+            {/* REJECT FAKE PAYMENT MODAL */}
+            {rejectingOrder && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+                <div className="liquid-glass-master rounded-3xl max-w-md w-full p-6 border border-rose-500/40 shadow-2xl space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0 border border-rose-500/40">
+                      <AlertCircle className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="font-extrabold text-base text-white">ফেক পেমেন্ট রসিদ রিজেক্ট করুন</h4>
+                      <p className="text-xs text-rose-300 font-mono">
+                        {rejectingOrder.orderId} · {rejectingOrder.studentName}
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-white/80 leading-relaxed">
+                    এই শিক্ষার্থীর জন্য পিডিএফ নোটস অ্যাক্সেস ব্লক করে দেওয়া হবে।
+                  </p>
+
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-white">
+                      বাতিলের কারণ নির্বাচন করুন:
+                    </label>
+                    <div className="grid grid-cols-1 gap-1.5">
+                      {[
+                        'ফেক পেমেন্ট রসিদ / এডিটেড স্ক্রিনশট',
+                        'ভুল বা অস্তিত্বহীন UTR / ট্রানজ্যাকশন নম্বর',
+                        'আমাদের ব্যাঙ্ক অ্যাকাউন্টে টাকা জমা হয়নি',
+                        'কম টাকা পাঠানো হয়েছে',
+                      ].map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setRejectReasonText(preset)}
+                          className={`text-left text-xs px-3 py-2 rounded-xl transition-all cursor-pointer ${
+                            rejectReasonText === preset
+                              ? 'bg-rose-600 text-white font-bold border border-rose-400'
+                              : 'bg-black/40 text-white/80 hover:bg-white/10 border border-white/15'
+                          }`}
+                        >
+                          {preset}
+                        </button>
+                      ))}
+                    </div>
+
+                    <input
+                      type="text"
+                      value={rejectReasonText}
+                      onChange={(e) => setRejectReasonText(e.target.value)}
+                      placeholder="কাস্টম কারণ লিখুন..."
+                      className="w-full mt-2 px-3.5 py-2 text-xs bg-black/50 border border-white/20 rounded-xl text-white focus:outline-none focus:border-rose-400"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => setRejectingOrder(null)}
+                      className="px-4 py-2 text-xs text-white/70 hover:text-white cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSubmittingReject}
+                      onClick={handleConfirmRejectOrder}
+                      className="px-5 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-full cursor-pointer shadow-md flex items-center gap-1.5"
+                    >
+                      {isSubmittingReject ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>বাতিল করা হচ্ছে...</span>
+                        </>
+                      ) : (
+                        <span>অর্ডার বাতিল ও রিজেক্ট করুন</span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Tab 5: Device Management & Admin Device Reset */}
+        {/* Tab 5: Device Management (1 Student = 1 Device Policy & Remote Device Removal) */}
         {activeTab === 'devices' && (
-          <div className="liquid-glass-master rounded-3xl border border-[#FFE7A3]/30 p-6 sm:p-8 space-y-4 shadow-2xl">
+          <div className="liquid-glass-master rounded-3xl border border-[#FFE7A3]/30 p-6 sm:p-8 space-y-5 shadow-2xl">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-white/10">
               <div>
-                <h3 className="text-lg font-black text-white">
-                  Registered Devices (1 Student = 1 Device)
-                </h3>
-                <p className="text-xs text-[#FFE7A3]">
-                  Only administrators can reset a student's bound device.
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-black text-white">
+                    Student Connected Devices (1 Student = 1 Device)
+                  </h3>
+                  <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/20 border border-emerald-400/40 px-2 py-0.5 rounded-full">
+                    Active Binding Policy
+                  </span>
+                </div>
+                <p className="text-xs text-[#FFE7A3] mt-0.5">
+                  ছাত্রছাত্রীরা কোন ডিভাইসে কানেক্ট রয়েছে (মোবাইল ক্রোম নাকি ডেস্কটপ ক্রোম) তা দেখুন এবং অননুমোদিত ডিভাইস রিমুভ করুন।
                 </p>
               </div>
 
@@ -1419,7 +1716,7 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
                 <Search className="w-3.5 h-3.5 text-white/40 absolute left-3 top-2.5" />
                 <input
                   type="text"
-                  placeholder="Search by student email..."
+                  placeholder="ছাত্রের নাম বা ইমেল দিয়ে খুঁজুন..."
                   value={searchFilter}
                   onChange={(e) => setSearchFilter(e.target.value)}
                   className="pl-8 pr-3 py-1.5 text-xs bg-black/40 border border-white/20 rounded-full text-white placeholder-white/40 focus:outline-none focus:border-[#FFD34E]"
@@ -1427,24 +1724,51 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
               </div>
             </div>
 
-            <div className="overflow-x-auto border border-white/15 rounded-2xl bg-black/20">
+            {/* Device Analytics Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div className="p-4 bg-black/40 rounded-2xl border border-white/10">
+                <span className="text-white/70 block text-[11px]">মোট রেজিস্টার্ড ডিভাইস</span>
+                <span className="text-2xl font-black text-[#FFD34E] block mt-1">
+                  {devices.length}
+                </span>
+                <span className="text-[10px] text-emerald-400">1:1 Protected</span>
+              </div>
+
+              <div className="p-4 bg-black/40 rounded-2xl border border-white/10">
+                <span className="text-white/70 block text-[11px]">📱 মোবাইল ক্রোম / সাফারি ইউজার</span>
+                <span className="text-2xl font-black text-white block mt-1">
+                  {devices.filter((d) => d.os?.toLowerCase().includes('mobile') || d.os?.toLowerCase().includes('android') || d.os?.toLowerCase().includes('iphone')).length}
+                </span>
+                <span className="text-[10px] text-white/50">মোবাইলে অধ্যয়নরত</span>
+              </div>
+
+              <div className="p-4 bg-black/40 rounded-2xl border border-white/10">
+                <span className="text-white/70 block text-[11px]">💻 ডেস্কটপ / ল্যাপটপ ইউজার</span>
+                <span className="text-2xl font-black text-white block mt-1">
+                  {devices.filter((d) => !d.os?.toLowerCase().includes('mobile') && !d.os?.toLowerCase().includes('android') && !d.os?.toLowerCase().includes('iphone')).length}
+                </span>
+                <span className="text-[10px] text-white/50">পিসি ব্রাউজার</span>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto border border-white/15 rounded-2xl bg-black/20 shadow-xl">
               <table className="w-full text-left text-xs">
-                <thead className="bg-black/40 text-[#FFE7A3] uppercase font-bold text-[10px] tracking-wider border-b border-white/10">
+                <thead className="bg-black/50 text-[#FFE7A3] uppercase font-bold text-[10px] tracking-wider border-b border-white/10">
                   <tr>
-                    <th className="p-3.5">Student Name</th>
-                    <th className="p-3.5">Email Address</th>
-                    <th className="p-3.5">Registered Device &amp; OS</th>
-                    <th className="p-3.5">IP Address</th>
-                    <th className="p-3.5">Status</th>
-                    <th className="p-3.5">Reset Count</th>
-                    <th className="p-3.5 text-right">Action</th>
+                    <th className="p-3.5">শিক্ষার্থীর নাম</th>
+                    <th className="p-3.5">কানেক্টেড ডিভাইস ও ওএস (Device)</th>
+                    <th className="p-3.5">ব্রাউজার ও স্ক্রিন রেজোলিউশন</th>
+                    <th className="p-3.5">আইপি এড্রেস</th>
+                    <th className="p-3.5">বাইন্ডিং স্ট্যাটাস</th>
+                    <th className="p-3.5">রিসেট হিস্ট্রি</th>
+                    <th className="p-3.5 text-right">ডিভাইস কন্ট্রোল</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/10">
                   {devices.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="p-8 text-center text-white/50">
-                        No devices registered yet. Devices register automatically upon first question bank open.
+                        এখনও কোনো ডিভাইস রেজিস্টার হয়নি। স্টুডেন্ট প্রথমবার পিডিএফ ওপেন করলে তার ডিভাইস স্বয়ংক্রিয়ভাবে লক হয়ে যাবে।
                       </td>
                     </tr>
                   ) : (
@@ -1455,39 +1779,66 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
                           d.userEmail.toLowerCase().includes(searchFilter.toLowerCase()) ||
                           d.studentName.toLowerCase().includes(searchFilter.toLowerCase())
                       )
-                      .map((d) => (
-                        <tr key={d.id} className="hover:bg-white/5">
-                          <td className="p-3.5 font-bold text-white">{d.studentName}</td>
-                          <td className="p-3.5 text-white/80">{d.userEmail}</td>
-                          <td className="p-3.5">
-                            <span className="block font-semibold text-white">{d.os}</span>
-                            <span className="text-[10px] text-white/50">{d.browser}</span>
-                          </td>
-                          <td className="p-3.5 font-mono text-[11px] text-[#FFE7A3]">{d.lastIp}</td>
-                          <td className="p-3.5">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                d.registrationStatus === 'active'
-                                  ? 'bg-emerald-500/20 text-emerald-300'
-                                  : 'bg-rose-500/20 text-rose-300'
-                              }`}
-                            >
-                              {d.registrationStatus.toUpperCase()}
-                            </span>
-                          </td>
-                          <td className="p-3.5 tabular-nums font-bold text-[#FFD34E]">{d.resetCount}</td>
-                          <td className="p-3.5 text-right">
-                            {d.registrationStatus === 'active' && (
-                              <button
-                                onClick={() => setSelectedDeviceUser(d)}
-                                className="px-3 py-1 text-xs font-bold text-rose-300 bg-rose-950/60 hover:bg-rose-900 border border-rose-500/40 rounded-full transition-colors cursor-pointer"
+                      .map((d) => {
+                        const isMobile =
+                          d.os?.toLowerCase().includes('mobile') ||
+                          d.os?.toLowerCase().includes('android') ||
+                          d.os?.toLowerCase().includes('iphone');
+
+                        return (
+                          <tr key={d.id} className="hover:bg-white/5 transition-colors">
+                            <td className="p-3.5">
+                              <span className="font-extrabold text-white block">{d.studentName}</span>
+                              <span className="text-[10px] text-white/50">{d.userEmail}</span>
+                            </td>
+                            <td className="p-3.5">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-white/10 text-white border border-white/15">
+                                {isMobile ? '📱' : '💻'} {d.os}
+                              </span>
+                            </td>
+                            <td className="p-3.5">
+                              <span className="block font-semibold text-white">{d.browser}</span>
+                              <span className="text-[10px] text-white/50">{d.deviceDescription}</span>
+                            </td>
+                            <td className="p-3.5 font-mono text-[11px] text-[#FFE7A3]">{d.lastIp}</td>
+                            <td className="p-3.5">
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                  d.registrationStatus === 'active'
+                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'
+                                    : 'bg-rose-500/20 text-rose-300 border border-rose-400/40'
+                                }`}
                               >
-                                Reset Device
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))
+                                {d.registrationStatus === 'active' ? '1:1 ACTIVE' : 'REVOKED'}
+                              </span>
+                            </td>
+                            <td className="p-3.5 tabular-nums font-bold text-[#FFD34E]">
+                              {d.resetCount} বার
+                            </td>
+                            <td className="p-3.5 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-2">
+                                {/* Reset Device Button */}
+                                <button
+                                  onClick={() => setSelectedDeviceUser(d)}
+                                  className="px-3 py-1 text-xs font-bold text-amber-200 bg-amber-950/60 hover:bg-amber-900 border border-amber-500/40 rounded-full transition-colors cursor-pointer"
+                                  title="Reset device binding (student can bind new device)"
+                                >
+                                  রিসেট করুন
+                                </button>
+
+                                {/* Remove Device Permanently Button */}
+                                <button
+                                  onClick={() => handleDeleteDevice(d.userId, d.studentName)}
+                                  className="px-3 py-1 text-xs font-bold text-rose-300 bg-rose-950/60 hover:bg-rose-900 border border-rose-500/40 rounded-full transition-colors cursor-pointer"
+                                  title="Remove device completely"
+                                >
+                                  রিমুভ
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
                   )}
                 </tbody>
               </table>
@@ -1498,7 +1849,7 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
                 <div className="liquid-glass-master rounded-3xl max-w-md w-full p-6 border border-white/20 shadow-2xl space-y-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
                       <AlertCircle className="w-5 h-5" />
                     </div>
                     <div>
@@ -1508,18 +1859,18 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
                   </div>
 
                   <p className="text-xs text-white/80 leading-relaxed">
-                    This will revoke the student's existing bound device token ({selectedDeviceUser.os}). The student will be allowed to bind their new device on their next login.
+                    এই শিক্ষার্থীর বর্তমান ডিভাইস ({selectedDeviceUser.os}) আনবাইন্ড করা হবে। শিক্ষার্থী তার নতুন ডিভাইসে পরবর্তী লগইনে যুক্ত হতে পারবে।
                   </p>
 
                   <div>
                     <label className="block text-xs font-bold text-white mb-1">
-                      Reason for Reset (Audit Logged)
+                      রিসেটের কারণ (অডিট লগ):
                     </label>
                     <input
                       type="text"
                       value={resetReason}
                       onChange={(e) => setResetReason(e.target.value)}
-                      placeholder="e.g. Student purchased new laptop / phone"
+                      placeholder="e.g. নতুন মোবাইল কিনেছে / ফোন পরিবর্তন করেছে"
                       className="w-full px-3.5 py-2 text-xs bg-black/50 border border-white/20 rounded-xl text-white focus:outline-none focus:border-[#FFD34E]"
                     />
                   </div>
@@ -1533,9 +1884,9 @@ export const AdminPanel: React.FC<{ onExit: () => void }> = ({ onExit }) => {
                     </button>
                     <button
                       onClick={handleExecuteDeviceReset}
-                      className="px-5 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-full cursor-pointer shadow-md"
+                      className="btn-gold-primary px-5 py-2 text-xs font-black rounded-full cursor-pointer shadow-md"
                     >
-                      Confirm Device Reset
+                      রিসেট অনুমোদন করুন
                     </button>
                   </div>
                 </div>
